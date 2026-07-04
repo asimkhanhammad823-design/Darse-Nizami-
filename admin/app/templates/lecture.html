@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ lecture_title }} - Dars-e-Nizami Admin{% endblock %}
+{% block content %}
+<p><a href="/books/{{ book_id }}">&larr; Back to lectures</a></p>
+<h1>{{ lecture_title }}</h1>
+
+<div class="card">
+  <audio id="player" controls preload="metadata" src="{{ stream_url }}" style="width: 100%"></audio>
+  <p class="hint">Note: the stream URL expires after 120 seconds — reload this page if playback stops working.</p>
+</div>
+
+<table class="list-table">
+  <thead>
+    <tr><th colspan="2">Time / Page</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for m in markers %}
+    <tr>
+      <td colspan="2">
+        <form method="post" action="/markers/{{ m.id }}/update" class="inline-form">
+          <input type="text" name="time_mmss" value="{{ m.mmss }}" size="6" />
+          <input type="number" name="page_number" value="{{ m.page_number }}" size="4" />
+          <input type="hidden" name="lecture_id" value="{{ lecture_id }}" />
+          <input type="hidden" name="book_id" value="{{ book_id }}" />
+          <input type="hidden" name="title" value="{{ lecture_title }}" />
+          <button type="submit">Save</button>
+        </form>
+      </td>
+      <td>
+        <form method="post" action="/markers/{{ m.id }}/delete" onsubmit="return confirm('Delete this marker?');">
+          <input type="hidden" name="lecture_id" value="{{ lecture_id }}" />
+          <input type="hidden" name="book_id" value="{{ book_id }}" />
+          <input type="hidden" name="title" value="{{ lecture_title }}" />
+          <button type="submit" class="danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="card">
+  <h2>Add Marker</h2>
+  <form method="post" action="/lectures/{{ lecture_id }}/markers" id="marker-form">
+    <label for="time_mmss">Time (mm:ss)</label>
+    <input type="text" id="time_mmss" name="time_mmss" placeholder="10:00" required />
+    <button type="button" id="mark-current-btn">Mark current time</button>
+    <label for="page_number">Page number</label>
+    <input type="number" id="page_number" name="page_number" required />
+    <input type="hidden" name="book_id" value="{{ book_id }}" />
+    <input type="hidden" name="title" value="{{ lecture_title }}" />
+    <button type="submit">Add Marker</button>
+  </form>
+</div>
+
+<script>
+  document.getElementById("mark-current-btn").addEventListener("click", function () {
+    const player = document.getElementById("player");
+    const totalSeconds = Math.floor(player.currentTime);
+    const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+    const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+    document.getElementById("time_mmss").value = `${minutes}:${seconds}`;
+  });
+</script>
+{% endblock %}

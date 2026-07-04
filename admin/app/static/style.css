@@ -1,0 +1,116 @@
+:root {
+  --navy: #001f3f;
+  --teal: #2ec4b6;
+  --bg: #f4f7f9;
+  --border: #dbe2e8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: #1b2733;
+}
+
+.topbar {
+  background: var(--navy);
+  color: #fff;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.topbar .brand {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 1.1rem;
+}
+
+.topbar .logout {
+  color: var(--teal);
+  text-decoration: none;
+}
+
+.content {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.1rem; }
+
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+.login-card {
+  max-width: 320px;
+  margin: 4rem auto;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+form.inline-form {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+label { font-size: 0.85rem; color: #52606d; }
+
+input, button {
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+
+button {
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+button.danger {
+  background: #b3261e;
+}
+
+button:hover { opacity: 0.9; }
+
+.list-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.list-table th, .list-table td {
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.list-table a {
+  color: var(--navy);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.error { color: #b3261e; }
+.hint { color: #52606d; font-size: 0.85rem; }

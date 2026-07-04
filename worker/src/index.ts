@@ -1,5 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import { signJwt, verifyJwt, type JwtPayload } from "./jwt";
+import { handleAdminRoute } from "./admin";
 
 export interface Env {
   DB: D1Database;
@@ -135,6 +136,13 @@ export default {
     // Everything below requires a valid session token.
     const auth = await requireAuth(request, env);
     if (!auth) return unauthorized();
+
+    if (pathname.startsWith("/admin/")) {
+      if (!auth.is_admin) return json({ error: "Admin access required" }, 403);
+      const adminResponse = await handleAdminRoute(request, env, pathname);
+      if (adminResponse) return adminResponse;
+      return json({ error: "Not found" }, 404);
+    }
 
     if (method === "GET" && pathname === "/darajas") {
       return handleDarajas(env);

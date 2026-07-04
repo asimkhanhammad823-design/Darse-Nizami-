@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{% block title %}Dars-e-Nizami Admin{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Dars-e-Nizami Admin</a>
+    {% if request.session.get("token") %}
+      <a class="logout" href="/logout">Log out</a>
+    {% endif %}
+  </header>
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

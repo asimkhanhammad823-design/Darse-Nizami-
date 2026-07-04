@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ book_name }} - Dars-e-Nizami Admin{% endblock %}
+{% block content %}
+<p><a href="/darajas/{{ daraja_id }}">&larr; Back to books</a></p>
+<h1>{{ book_name }} — Lectures</h1>
+
+<table class="list-table">
+  <thead>
+    <tr><th>Title</th><th>Duration</th><th>Sort</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for l in lectures %}
+    <tr>
+      <td><a href="/lectures/{{ l.id }}?title={{ l.title | urlencode }}&book_id={{ book_id }}">{{ l.title }}</a></td>
+      <td>{{ l.duration_seconds if l.duration_seconds is not none else "-" }}s</td>
+      <td>{{ l.sort_order }}</td>
+      <td>
+        <form method="post" action="/lectures/{{ l.id }}/delete" onsubmit="return confirm('Delete this lecture and its markers?');">
+          <input type="hidden" name="book_id" value="{{ book_id }}" />
+          <button type="submit" class="danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="card">
+  <h2>Add Lecture (upload audio)</h2>
+  <form method="post" action="/books/{{ book_id }}/lectures" enctype="multipart/form-data">
+    <label for="title">Title</label>
+    <input type="text" id="title" name="title" required />
+    <label for="audio_file">Audio file (mp3/m4a)</label>
+    <input type="file" id="audio_file" name="audio_file" accept="audio/*" required />
+    <label for="sort_order">Sort order</label>
+    <input type="number" id="sort_order" name="sort_order" value="0" />
+    <button type="submit">Upload &amp; Create</button>
+  </form>
+</div>
+{% endblock %}

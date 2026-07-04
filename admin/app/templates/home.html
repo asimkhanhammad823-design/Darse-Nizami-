@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Darjas - Dars-e-Nizami Admin{% endblock %}
+{% block content %}
+<h1>Darjas</h1>
+
+<table class="list-table">
+  <thead>
+    <tr><th>Name</th><th>Sort</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for d in darajas %}
+    <tr>
+      <td><a href="/darajas/{{ d.id }}?name={{ d.name | urlencode }}">{{ d.name }}</a></td>
+      <td>{{ d.sort_order }}</td>
+      <td>
+        <form method="post" action="/darajas/{{ d.id }}/delete" onsubmit="return confirm('Delete this daraja and everything under it?');">
+          <button type="submit" class="danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="card">
+  <h2>Add Daraja</h2>
+  <form method="post" action="/darajas">
+    <label for="name">Name</label>
+    <input type="text" id="name" name="name" required />
+    <label for="sort_order">Sort order</label>
+    <input type="number" id="sort_order" name="sort_order" value="0" />
+    <button type="submit">Create</button>
+  </form>
+</div>
+{% endblock %}
