@@ -10,15 +10,15 @@ binding = "DB"
 database_name = "dars_db"
 database_id = "914ecfc0-0220-435e-99c8-d04af80eca2d"
 
-# ---- R2 bucket binding ----
-# Create with: wrangler r2 bucket create dars-audio
-[[r2_buckets]]
-binding = "AUDIO_BUCKET"
-bucket_name = "dars-audio"
+# ---- Audio storage: Backblaze B2 (S3-compatible, private bucket) ----
+# Not secret (bucket name / endpoint / region are not credentials).
+[vars]
+B2_ENDPOINT = "s3.us-east-005.backblazeb2.com"
+B2_REGION = "us-east-005"
+B2_BUCKET = "dars-audio"
 
 # ---- Secrets (do NOT put real values here) ----
 # Set these with `wrangler secret put <NAME>`:
-#   JWT_SECRET        - random long string, used to sign session tokens
-#   R2_ACCOUNT_ID      - your Cloudflare account id
-#   R2_ACCESS_KEY_ID   - R2 S3 API token access key
-#   R2_SECRET_ACCESS_KEY - R2 S3 API token secret key
+#   JWT_SECRET         - random long string, used to sign session tokens
+#   B2_KEY_ID          - Backblaze B2 application key ID
+#   B2_APPLICATION_KEY - Backblaze B2 application key secret

@@ -3,11 +3,12 @@ import { signJwt, verifyJwt, type JwtPayload } from "./jwt";
 
 export interface Env {
   DB: D1Database;
-  AUDIO_BUCKET: R2Bucket;
   JWT_SECRET: string;
-  R2_ACCOUNT_ID: string;
-  R2_ACCESS_KEY_ID: string;
-  R2_SECRET_ACCESS_KEY: string;
+  B2_ENDPOINT: string;
+  B2_REGION: string;
+  B2_BUCKET: string;
+  B2_KEY_ID: string;
+  B2_APPLICATION_KEY: string;
 }
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
@@ -105,15 +106,13 @@ async function handleStreamUrl(env: Env, lectureId: string): Promise<Response> {
   if (!lecture) return json({ error: "Lecture not found" }, 404);
 
   const client = new AwsClient({
-    accessKeyId: env.R2_ACCESS_KEY_ID,
-    secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+    accessKeyId: env.B2_KEY_ID,
+    secretAccessKey: env.B2_APPLICATION_KEY,
     service: "s3",
-    region: "auto",
+    region: env.B2_REGION,
   });
 
-  const endpoint = `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/dars-audio/${encodeURIComponent(
-    lecture.audio_key
-  )}`;
+  const endpoint = `https://${env.B2_ENDPOINT}/${env.B2_BUCKET}/${encodeURIComponent(lecture.audio_key)}`;
 
   const signedRequest = await client.sign(
     new Request(`${endpoint}?X-Amz-Expires=${STREAM_URL_TTL_SECONDS}`, { method: "GET" }),
