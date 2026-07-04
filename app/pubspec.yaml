@@ -1,0 +1,24 @@
+name: dars_nizami
+description: Audio Dars-e-Nizami student app
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  flutter_secure_storage: ^9.2.2
+  just_audio: ^0.9.40
+  just_audio_background: ^0.0.1-beta.13
+  flutter_windowmanager: ^0.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
