@@ -8,7 +8,7 @@ compatibility_date = "2024-11-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "dars_db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "914ecfc0-0220-435e-99c8-d04af80eca2d"
 
 # ---- R2 bucket binding ----
 # Create with: wrangler r2 bucket create dars-audio
