@@ -1,0 +1,24 @@
+name = "dars-worker"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# ---- D1 database binding ----
+# Create with: wrangler d1 create dars_db
+# Then paste the database_id it prints below.
+[[d1_databases]]
+binding = "DB"
+database_name = "dars_db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# ---- R2 bucket binding ----
+# Create with: wrangler r2 bucket create dars-audio
+[[r2_buckets]]
+binding = "AUDIO_BUCKET"
+bucket_name = "dars-audio"
+
+# ---- Secrets (do NOT put real values here) ----
+# Set these with `wrangler secret put <NAME>`:
+#   JWT_SECRET        - random long string, used to sign session tokens
+#   R2_ACCOUNT_ID      - your Cloudflare account id
+#   R2_ACCESS_KEY_ID   - R2 S3 API token access key
+#   R2_SECRET_ACCESS_KEY - R2 S3 API token secret key

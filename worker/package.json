@@ -1,0 +1,19 @@
+{
+  "name": "dars-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply dars_db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply dars_db --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0",
+    "typescript": "^5.5.4",
+    "@cloudflare/workers-types": "^4.20241004.0"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
+  }
+}
