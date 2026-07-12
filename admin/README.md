@@ -1,4 +1,9 @@
-# Dars-e-Nizami Admin Panel (Phase 2)
+# Dars-e-Nizami Admin Panel (Phase 2) — optional local alternative
+
+> **Note:** you probably don't need this anymore. The Worker now serves a
+> full hosted admin panel at `https://<your-worker>.workers.dev/panel` that
+> works from any browser with no installation — see the worker README.
+> This FastAPI panel remains as a local alternative.
 
 A small local tool (FastAPI + server-rendered HTML) you run on your own PC only
 when adding content. It talks to the Cloudflare Worker (Phase 1) for all data,

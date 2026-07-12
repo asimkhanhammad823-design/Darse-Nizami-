@@ -9,9 +9,14 @@ codes from a simple panel.
 
 | Part | Folder | Tech | Where it runs | Cost |
 |---|---|---|---|---|
-| **Backend API** | [`worker/`](worker/) | Cloudflare Workers + D1 + Backblaze B2 | Cloudflare free tier, always on | $0 |
-| **Admin panel** | [`admin/`](admin/) | FastAPI (Python) | Your own PC (`localhost`), only when adding content | $0 |
+| **Backend API + Admin panel** | [`worker/`](worker/) | Cloudflare Workers + D1 + Backblaze B2 | Cloudflare free tier, always on — admin panel is hosted at `/panel` | $0 |
 | **Student app** | [`app/`](app/) | Flutter (Android) | Students' phones | $0 |
+| **Local admin panel** (optional) | [`admin/`](admin/) | FastAPI (Python) | Your own PC (`localhost`) — optional alternative to `/panel` | $0 |
+
+**Admins need no PC setup at all**: the admin panel is served online by the
+Worker itself at `https://<your-worker>.workers.dev/panel` — open it in any
+browser, log in with an admin access code, and manage everything (including
+audio uploads) from there.
 
 Audio files live in a **private** Backblaze B2 bucket (10 GB free) and are
 only ever served through short-lived signed URLs issued by the Worker to
@@ -19,10 +24,10 @@ logged-in users — there is no public link to any audio file.
 
 ## Setup order
 
-1. **`worker/`** — deploy the API first (see [worker/README.md](worker/README.md)).
-2. **`admin/`** — run the panel locally, log in with your admin access code,
-   create Darjas/Books/Lectures and student access codes
-   (see [admin/README.md](admin/README.md)).
+1. **`worker/`** — deploy the API + hosted admin panel
+   (see [worker/README.md](worker/README.md)).
+2. **Open `/panel`** in a browser, log in with your admin access code, and
+   create Darjas/Books/Lectures and student access codes.
 3. **`app/`** — build the Android app and hand it to students along with
    their access codes (see [app/README.md](app/README.md)).
 

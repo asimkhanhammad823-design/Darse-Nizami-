@@ -1,6 +1,6 @@
 import type { Env } from "./index";
 import type { JwtPayload } from "./jwt";
-import { deleteObjects } from "./b2";
+import { b2Client, deleteObjects, objectUrl } from "./b2";
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -313,6 +313,56 @@ async function deleteMarker(env: Env, id: string): Promise<Response> {
   return json({ deleted: true });
 }
 
+// ---- Audio upload (streamed through the Worker into the private bucket) ----
+
+const AUDIO_CONTENT_TYPES: Record<string, string> = {
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  ogg: "audio/ogg",
+  opus: "audio/opus",
+  wav: "audio/wav",
+  flac: "audio/flac",
+};
+
+async function uploadAudio(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const filename = url.searchParams.get("filename") || "";
+  const ext = filename.includes(".") ? filename.split(".").pop()!.toLowerCase() : "";
+  const contentType = AUDIO_CONTENT_TYPES[ext];
+  if (!contentType) {
+    return badRequest(
+      `Unsupported audio file. Allowed extensions: ${Object.keys(AUDIO_CONTENT_TYPES).join(", ")}`
+    );
+  }
+  const contentLength = request.headers.get("content-length");
+  if (!contentLength || Number(contentLength) <= 0) {
+    return badRequest("The uploaded file is empty");
+  }
+  if (!request.body) return badRequest("Missing request body");
+
+  const key = `audio/lec_${Math.floor(Date.now() / 1000)}_${crypto.randomUUID().slice(0, 8)}.${ext}`;
+
+  // Stream the incoming body straight to B2 without buffering it in memory.
+  // UNSIGNED-PAYLOAD lets aws4fetch sign the request without hashing the body.
+  const signed = await b2Client(env).sign(
+    new Request(objectUrl(env, key), {
+      method: "PUT",
+      headers: {
+        "content-length": contentLength,
+        "content-type": contentType,
+        "x-amz-content-sha256": "UNSIGNED-PAYLOAD",
+      },
+      body: request.body,
+    })
+  );
+  const b2Response = await fetch(signed);
+  if (!b2Response.ok) {
+    return json({ error: `Storage upload failed (${b2Response.status})` }, 502);
+  }
+  return json({ audio_key: key }, 201);
+}
+
 // ---- Users (student access codes) ----
 
 // Unambiguous alphabet (no 0/O, 1/I/L) so codes are easy to read out loud.
@@ -429,6 +479,8 @@ export async function handleAdminRoute(
   m = pathname.match(/^\/admin\/markers\/(\d+)$/);
   if (m && method === "PUT") return updateMarker(request, env, m[1]);
   if (m && method === "DELETE") return deleteMarker(env, m[1]);
+
+  if (method === "POST" && pathname === "/admin/upload") return uploadAudio(request, env);
 
   if (method === "GET" && pathname === "/admin/users") return listUsers(env);
   if (method === "POST" && pathname === "/admin/users") return createUser(request, env);

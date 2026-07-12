@@ -113,6 +113,28 @@ npm run deploy
 
 Wrangler prints your live URL, e.g. `https://dars-worker.<your-subdomain>.workers.dev`.
 
+## 11. The hosted admin panel (no PC setup needed)
+
+The Worker also serves a full admin panel at:
+
+```
+https://dars-worker.<your-subdomain>.workers.dev/panel
+```
+
+Open it in any browser (phone or PC), log in with an admin access code, and
+you can do everything: create/rename/delete Darjas, Books and Lectures,
+**upload audio files** (with a progress bar; duration is detected
+automatically), manage page markers with a "Mark current time" button, and
+create/revoke student access codes on the Users page.
+
+This runs entirely on the Worker's free tier — there is nothing extra to
+deploy or pay for, and your admins never need Python or `localhost`. Audio
+uploads stream through the Worker into the private B2 bucket (up to ~100 MB
+per file, which is about 3 hours of speech at 64 kbps).
+
+The `admin/` FastAPI panel still works as a local alternative, but `/panel`
+is the recommended way to administer content.
+
 ## API summary
 
 | Method | Path | Auth | Notes |

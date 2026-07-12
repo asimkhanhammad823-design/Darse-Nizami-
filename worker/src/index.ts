@@ -1,6 +1,7 @@
 import { signJwt, verifyJwt, type JwtPayload } from "./jwt";
 import { handleAdminRoute } from "./admin";
 import { signStreamUrl } from "./b2";
+import { PANEL_HTML } from "./panel";
 
 export interface Env {
   DB: D1Database;
@@ -128,6 +129,14 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
   if (method === "GET" && pathname === "/health") {
     return json({ ok: true });
+  }
+
+  // The hosted admin panel. Serving the page needs no auth — every data
+  // call it makes goes through the normal admin-token checks below.
+  if (method === "GET" && (pathname === "/panel" || pathname === "/panel/")) {
+    return new Response(PANEL_HTML, {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
   }
 
   if (method === "POST" && pathname === "/login") {

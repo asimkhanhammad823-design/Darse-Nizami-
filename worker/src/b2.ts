@@ -4,6 +4,10 @@
 import { AwsClient } from "aws4fetch";
 import type { Env } from "./index";
 
+export function b2Client(env: Env): AwsClient {
+  return client(env);
+}
+
 function client(env: Env): AwsClient {
   return new AwsClient({
     accessKeyId: env.B2_KEY_ID,
@@ -22,7 +26,7 @@ function encodeKey(key: string): string {
     .join("/");
 }
 
-function objectUrl(env: Env, key: string): string {
+export function objectUrl(env: Env, key: string): string {
   return `https://${env.B2_ENDPOINT}/${env.B2_BUCKET}/${encodeKey(key)}`;
 }
 
