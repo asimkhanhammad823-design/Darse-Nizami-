@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Error - Dars-e-Nizami Admin{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Something went wrong</h1>
+  <p class="error">{{ message }}</p>
+  <p><a href="{{ back_url }}">&larr; Go back</a></p>
+</div>
+{% endblock %}

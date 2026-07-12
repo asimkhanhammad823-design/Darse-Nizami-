@@ -9,7 +9,11 @@
   <header class="topbar">
     <a class="brand" href="/">Dars-e-Nizami Admin</a>
     {% if request.session.get("token") %}
-      <a class="logout" href="/logout">Log out</a>
+      <nav class="topnav">
+        <a href="/">Darjas</a>
+        <a href="/users">Users</a>
+        <a class="logout" href="/logout">Log out</a>
+      </nav>
     {% endif %}
   </header>
   <main class="content">

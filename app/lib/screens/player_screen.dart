@@ -6,6 +6,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 
 import '../api/api_client.dart';
 import '../api/models.dart';
+import '../services/progress_store.dart';
 import '../theme.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -20,11 +21,16 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   final AudioPlayer _player = AudioPlayer();
+  final ProgressStore _progressStore = ProgressStore();
   List<PageMarker> _markers = [];
   bool _loading = true;
   String? _error;
   double _speed = 1.0;
   StreamSubscription? _errorSubscription;
+  StreamSubscription<Duration>? _positionSubscription;
+  StreamSubscription<ProcessingState>? _processingSubscription;
+  int _lastSavedSeconds = -1;
+  bool _recovering = false;
 
   static const _speeds = [1.0, 1.25, 1.5, 2.0];
 
@@ -35,28 +41,68 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _init() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final markers = await widget.apiClient.getMarkers(widget.lecture.id);
+      if (!mounted) return;
       setState(() => _markers = markers);
-      await _loadAudioSource();
 
-      // The signed stream URL expires after ~120s. If a later seek/request
+      // Resume where the student left off last time (kept on-device only).
+      final savedSeconds = await _progressStore.readPosition(widget.lecture.id);
+      Duration? initialPosition;
+      if (savedSeconds != null && savedSeconds > 10) {
+        final total = widget.lecture.durationSeconds;
+        if (total == null || savedSeconds < total - 15) {
+          initialPosition = Duration(seconds: savedSeconds);
+        }
+      }
+      await _loadAudioSource(initialPosition: initialPosition);
+
+      // The signed stream URL eventually expires. If a later seek/request
       // fails because of that, transparently fetch a fresh URL and resume
       // from the same position instead of surfacing an error to the user.
       _errorSubscription = _player.playbackEventStream.listen(
         (_) {},
         onError: (Object e, StackTrace st) async {
+          if (_recovering) return;
+          _recovering = true;
           final position = _player.position;
           final wasPlaying = _player.playing;
           try {
             await _loadAudioSource(initialPosition: position, autoplay: wasPlaying);
           } catch (_) {
             // Genuine failure (no internet, lecture removed, etc.)
+          } finally {
+            _recovering = false;
           }
         },
       );
+
+      // Periodically remember the playback position for resume-on-return.
+      _positionSubscription = _player.positionStream.listen((position) {
+        final seconds = position.inSeconds;
+        if ((seconds - _lastSavedSeconds).abs() >= 5) {
+          _lastSavedSeconds = seconds;
+          _progressStore.savePosition(widget.lecture.id, seconds);
+        }
+      });
+
+      // A finished lecture should restart from the beginning next time.
+      _processingSubscription = _player.processingStateStream.listen((state) {
+        if (state == ProcessingState.completed) {
+          _lastSavedSeconds = -1;
+          _progressStore.clearPosition(widget.lecture.id);
+        }
+      });
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = 'Could not load this lecture. Please try again.');
+      if (mounted) {
+        setState(() => _error = 'Could not load this lecture. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -81,7 +127,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
+    // Save the final position before tearing the player down.
+    final seconds = _player.position.inSeconds;
+    if (seconds > 0) {
+      _progressStore.savePosition(widget.lecture.id, seconds);
+    }
     _errorSubscription?.cancel();
+    _positionSubscription?.cancel();
+    _processingSubscription?.cancel();
     _player.dispose();
     super.dispose();
   }
@@ -96,12 +149,21 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return '$minutes:$seconds';
   }
 
+  String _formatSpeed(double speed) {
+    // "1x", "1.25x", "1.5x", "2x" — no trailing ".0".
+    final text = speed == speed.roundToDouble() ? speed.toInt().toString() : speed.toString();
+    return '${text}x';
+  }
+
   void _seekRelative(int deltaSeconds) {
     final newPosition = _player.position + Duration(seconds: deltaSeconds);
-    final duration = _player.duration ?? Duration.zero;
-    final clamped = newPosition < Duration.zero
-        ? Duration.zero
-        : (newPosition > duration ? duration : newPosition);
+    final duration = _player.duration;
+    var clamped = newPosition < Duration.zero ? Duration.zero : newPosition;
+    // Only clamp to the end when the real duration is known; a null/zero
+    // duration would otherwise snap every forward-seek back to 0:00.
+    if (duration != null && duration > Duration.zero && clamped > duration) {
+      clamped = duration;
+    }
     _player.seek(clamped);
   }
 
@@ -117,8 +179,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? _buildError()
               : _buildPlayer(),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, size: 48, color: Colors.black38),
+            const SizedBox(height: 12),
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _init,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -245,7 +329,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
             children: _speeds.map((speed) {
               final selected = speed == _speed;
               return ChoiceChip(
-                label: Text('${speed}x'),
+                label: Text(_formatSpeed(speed)),
                 selected: selected,
                 onSelected: (_) => _setSpeed(speed),
               );

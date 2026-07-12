@@ -6,7 +6,7 @@
 
 <div class="card">
   <audio id="player" controls preload="metadata" src="{{ stream_url }}" style="width: 100%"></audio>
-  <p class="hint">Note: the stream URL expires after 120 seconds — reload this page if playback stops working.</p>
+  <p class="hint">Note: the stream URL expires after {{ stream_expires_in }} seconds — reload this page if playback stops working.</p>
 </div>
 
 <table class="list-table">

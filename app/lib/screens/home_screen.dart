@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../api/models.dart';
 import '../services/auth_storage.dart';
+import '../widgets/list_loader.dart';
 import 'books_screen.dart';
 import 'login_screen.dart';
 
@@ -17,16 +18,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late Future<List<Daraja>> _darajasFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _darajasFuture = widget.apiClient.getDarajas();
-  }
-
   Future<void> _logout() async {
     await widget.authStorage.clear();
+    widget.apiClient.setToken(null);
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
@@ -45,45 +39,32 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Darajas'),
         actions: [
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Log out',
+            onPressed: _logout,
+          ),
         ],
       ),
-      body: FutureBuilder<List<Daraja>>(
-        future: _darajasFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Failed to load: ${snapshot.error}'));
-          }
-          final darajas = snapshot.data ?? [];
-          if (darajas.isEmpty) {
-            return const Center(child: Text('No darajas yet.'));
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: darajas.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final daraja = darajas[index];
-              return Card(
-                child: ListTile(
-                  title: Text(daraja.name, style: Theme.of(context).textTheme.titleMedium),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => BooksScreen(
-                          apiClient: widget.apiClient,
-                          daraja: daraja,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
+      body: ListLoader<Daraja>(
+        load: () => widget.apiClient.getDarajas(),
+        emptyMessage: 'No darajas yet.',
+        itemBuilder: (context, daraja) {
+          return Card(
+            child: ListTile(
+              title: Text(daraja.name, style: Theme.of(context).textTheme.titleMedium),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => BooksScreen(
+                      apiClient: widget.apiClient,
+                      daraja: daraja,
+                    ),
+                  ),
+                );
+              },
+            ),
           );
         },
       ),

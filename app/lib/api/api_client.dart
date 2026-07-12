@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
@@ -7,6 +10,8 @@ class ApiException implements Exception {
   final int statusCode;
   final String message;
   ApiException(this.statusCode, this.message);
+
+  bool get isNetworkError => statusCode == 0;
 
   @override
   String toString() => message;
@@ -20,8 +25,14 @@ const String kWorkerBaseUrl = String.fromEnvironment(
   defaultValue: 'https://dars-worker.ateekkhan-dars.workers.dev',
 );
 
+const Duration _kRequestTimeout = Duration(seconds: 20);
+
 class ApiClient {
   String? _token;
+
+  /// Invoked when an authenticated request returns 401, so the app can
+  /// clear the stored token and return to the login screen.
+  Future<void> Function()? onUnauthorized;
 
   void setToken(String? token) {
     _token = token;
@@ -31,10 +42,23 @@ class ApiClient {
       _token == null ? {} : {'authorization': 'Bearer $_token'};
 
   Future<dynamic> _get(String path) async {
-    final response = await http.get(
-      Uri.parse('$kWorkerBaseUrl$path'),
-      headers: _authHeaders,
-    );
+    final http.Response response;
+    try {
+      response = await http
+          .get(Uri.parse('$kWorkerBaseUrl$path'), headers: _authHeaders)
+          .timeout(_kRequestTimeout);
+    } on SocketException {
+      throw ApiException(0, 'No internet connection. Please check your network and try again.');
+    } on TimeoutException {
+      throw ApiException(0, 'The server took too long to respond. Please try again.');
+    } on http.ClientException {
+      throw ApiException(0, 'Could not reach the server. Please try again.');
+    }
+    if (response.statusCode == 401) {
+      // Session token expired/revoked — let the app force a re-login.
+      final handler = onUnauthorized;
+      if (handler != null) unawaited(handler());
+    }
     return _handle(response);
   }
 
@@ -55,11 +79,22 @@ class ApiClient {
 
   /// Returns the session token on success, throws ApiException otherwise.
   Future<String> login(String accessCode) async {
-    final response = await http.post(
-      Uri.parse('$kWorkerBaseUrl/login'),
-      headers: {'content-type': 'application/json'},
-      body: jsonEncode({'access_code': accessCode}),
-    );
+    final http.Response response;
+    try {
+      response = await http
+          .post(
+            Uri.parse('$kWorkerBaseUrl/login'),
+            headers: {'content-type': 'application/json'},
+            body: jsonEncode({'access_code': accessCode}),
+          )
+          .timeout(_kRequestTimeout);
+    } on SocketException {
+      throw ApiException(0, 'No internet connection. Please check your network and try again.');
+    } on TimeoutException {
+      throw ApiException(0, 'The server took too long to respond. Please try again.');
+    } on http.ClientException {
+      throw ApiException(0, 'Could not reach the server. Please try again.');
+    }
     final data = _handle(response) as Map<String, dynamic>;
     return data['token'] as String;
   }

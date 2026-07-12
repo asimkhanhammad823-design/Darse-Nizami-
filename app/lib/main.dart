@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_windowmanager/flutter_windowmanager.dart';
+import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
 import 'api/api_client.dart';
@@ -8,13 +8,21 @@ import 'screens/home_screen.dart';
 import 'services/auth_storage.dart';
 import 'theme.dart';
 
+/// Global navigator so the API client can force a return to the login
+/// screen when the session token expires, from anywhere in the app.
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Blocks screenshots and screen recording at the OS level for the whole
   // app (a Flutter app runs in a single Activity, so one call here secures
-  // every screen).
-  await FlutterWindowManager.addFlags(FlutterWindowManager.FLAG_SECURE);
+  // every screen). Must never prevent startup if the platform call fails.
+  try {
+    await FlutterWindowManagerPlus.addFlags(FlutterWindowManagerPlus.FLAG_SECURE);
+  } catch (_) {
+    // Non-Android platform or plugin failure — continue without FLAG_SECURE.
+  }
 
   // Enables background playback + lock-screen controls for just_audio.
   await JustAudioBackground.init(
@@ -35,6 +43,7 @@ class DarsNizamiApp extends StatelessWidget {
       title: 'Dars-e-Nizami',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      navigatorKey: navigatorKey,
       home: const _StartupGate(),
     );
   }
@@ -53,11 +62,13 @@ class _StartupGateState extends State<_StartupGate> {
   final _authStorage = AuthStorage();
   final _apiClient = ApiClient();
   bool _checking = true;
+  bool _loggingOut = false;
   String? _token;
 
   @override
   void initState() {
     super.initState();
+    _apiClient.onUnauthorized = _handleSessionExpired;
     _loadToken();
   }
 
@@ -67,6 +78,29 @@ class _StartupGateState extends State<_StartupGate> {
       _token = token;
       _checking = false;
     });
+  }
+
+  /// Called by ApiClient whenever an authenticated request comes back 401
+  /// (e.g. the 30-day token expired or the access code was revoked).
+  Future<void> _handleSessionExpired() async {
+    if (_loggingOut) return;
+    _loggingOut = true;
+    try {
+      await _authStorage.clear();
+      _apiClient.setToken(null);
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => LoginScreen(
+            apiClient: _apiClient,
+            authStorage: _authStorage,
+            message: 'Your session has expired. Please log in again.',
+          ),
+        ),
+        (route) => false,
+      );
+    } finally {
+      _loggingOut = false;
+    }
   }
 
   @override

@@ -122,9 +122,18 @@ flutter run --dart-define=WORKER_BASE_URL=https://your-worker.workers.dev
     position
 - `FLAG_SECURE` set once at app startup (`main.dart`), which covers every
   screen since a Flutter app runs in a single Android Activity — blocks
-  screenshots and screen recording at the OS level
+  screenshots and screen recording at the OS level (via the maintained
+  `flutter_windowmanager_plus` plugin; the call is wrapped in try/catch so a
+  plugin failure can never block app startup)
 - No download or share button anywhere; audio is only ever played from the
   in-memory signed URL
+- **Resume playback** — the app remembers your position in each lecture
+  (on-device only, via `shared_preferences`) and resumes from there
+- **Session-expiry handling** — if the 30-day token expires or the access
+  code is revoked, the app returns to the login screen with a clear message
+  instead of showing raw errors
+- **Pull-to-refresh + Retry** on all list screens, and friendly, specific
+  error messages (no-internet vs invalid code vs server error)
 
 ## Not implemented (per the spec's "honest limitations")
 

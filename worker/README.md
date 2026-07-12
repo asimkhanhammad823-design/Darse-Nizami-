@@ -74,9 +74,11 @@ npx wrangler secret put B2_APPLICATION_KEY
 # paste your Backblaze applicationKey
 ```
 
-## 8. Create your first admin user + test content (manually, for now)
+## 8. Create your first admin user (one manual step)
 
-Until the Phase 2 admin panel exists, insert rows directly:
+Only the very first admin needs manual SQL — after that, all users
+(students and additional admins) are managed from the admin panel's
+**Users** page:
 
 ```bash
 npx wrangler d1 execute dars_db --remote --command "INSERT INTO app_user (access_code, name, is_admin) VALUES ('ADMIN123', 'Admin', 1);"
@@ -115,12 +117,28 @@ Wrangler prints your live URL, e.g. `https://dars-worker.<your-subdomain>.worker
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST | `/login` | none | body `{access_code}` → `{token, is_admin}` |
+| GET | `/health` | none | `{ok: true}` — quick deploy check |
+| POST | `/login` | none | body `{access_code}` → `{token, is_admin, name}` |
 | GET | `/darajas` | Bearer token | list of darajas |
 | GET | `/darajas/:id/books` | Bearer token | books in a darja |
 | GET | `/books/:id/lectures` | Bearer token | lectures (no `audio_key`) |
 | GET | `/lectures/:id/markers` | Bearer token | page markers, sorted |
-| GET | `/lectures/:id/stream-url` | Bearer token | `{url, expires_in:120}` signed B2 URL |
+| GET | `/lectures/:id/stream-url` | Bearer token | `{url, expires_in:600}` signed B2 URL |
+
+Admin endpoints (require a token whose user has `is_admin = 1`):
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/admin/darajas` | `{name, sort_order?}` |
+| PUT / DELETE | `/admin/darajas/:id` | delete cascades and removes B2 audio |
+| POST | `/admin/books` | `{daraja_id, name, sort_order?}` |
+| PUT / DELETE | `/admin/books/:id` | delete cascades and removes B2 audio |
+| POST | `/admin/lectures` | `{book_id, title, audio_key, duration_seconds?, sort_order?}` |
+| GET / PUT / DELETE | `/admin/lectures/:id` | delete also removes the B2 audio object |
+| POST | `/admin/lectures/:id/markers` | `{time_seconds, page_number}` |
+| PUT / DELETE | `/admin/markers/:id` | |
+| GET / POST | `/admin/users` | create body `{name?, access_code?, is_admin?}` — omit `access_code` to auto-generate a random 8-char code |
+| PUT / DELETE | `/admin/users/:id` | you cannot delete your own account |
 
 ## Phase 1 test checklist
 
@@ -128,5 +146,5 @@ Wrangler prints your live URL, e.g. `https://dars-worker.<your-subdomain>.worker
 - [ ] `/login` with a valid access code returns a token; invalid code returns 401
 - [ ] `/darajas`, `/darajas/:id/books`, `/books/:id/lectures`, `/lectures/:id/markers` all work with the token and return 401 without it
 - [ ] `/lectures/:id/stream-url` returns a URL that plays the audio in a browser/VLC
-- [ ] That same URL returns an access-denied error if you wait ~2 minutes and try again
+- [ ] That same URL returns an access-denied error if you wait ~10 minutes and try again
 - [ ] `wrangler deploy` succeeds and the deployed URL behaves the same as local

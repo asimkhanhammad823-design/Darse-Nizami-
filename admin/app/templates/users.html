@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Users - Dars-e-Nizami Admin{% endblock %}
+{% block content %}
+<h1>Users &amp; Access Codes</h1>
+
+{% if new_code %}
+<div class="card success">
+  <strong>User created.</strong> Access code: <code class="access-code">{{ new_code }}</code>
+  — share this code with the student (it is how they log in to the app).
+</div>
+{% endif %}
+
+<table class="list-table">
+  <thead>
+    <tr><th>Name / Access code / Admin</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>
+        <form method="post" action="/users/{{ u.id }}/update" class="inline-form">
+          <input type="text" name="name" value="{{ u.name or '' }}" placeholder="(no name)" />
+          <input type="text" name="access_code" value="{{ u.access_code }}" class="access-code" />
+          <label class="checkbox-label">
+            <input type="checkbox" name="is_admin" value="1" {% if u.is_admin %}checked{% endif %} /> admin
+          </label>
+          <button type="submit">Save</button>
+        </form>
+      </td>
+      <td>
+        <form method="post" action="/users/{{ u.id }}/delete" onsubmit="return confirm('Remove this user? Their access code will stop working immediately.');">
+          <button type="submit" class="danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="card">
+  <h2>Add User</h2>
+  <form method="post" action="/users">
+    <label for="name">Name (optional, e.g. the student's name)</label>
+    <input type="text" id="name" name="name" />
+    <label for="access_code">Access code (leave blank to auto-generate a safe random code)</label>
+    <input type="text" id="access_code" name="access_code" placeholder="auto-generate" />
+    <label class="checkbox-label">
+      <input type="checkbox" name="is_admin" value="1" /> Admin (can use this panel)
+    </label>
+    <button type="submit">Create user</button>
+  </form>
+</div>
+{% endblock %}
