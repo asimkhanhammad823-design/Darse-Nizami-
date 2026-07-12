@@ -13,9 +13,6 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   just_audio: ^0.9.40
   just_audio_background: ^0.0.1-beta.13
-  # Maintained fork of flutter_windowmanager (the original is abandoned and
-  # fails to build against modern Android Gradle Plugin versions).
-  flutter_windowmanager_plus: ^1.0.0
   shared_preferences: ^2.2.3
 
 dev_dependencies:

@@ -39,8 +39,8 @@ jobs:
         working-directory: app
         run: flutter create --org com.darsenizami --project-name dars_nizami --platforms android .
 
-      - name: Patch AndroidManifest (permissions + background-audio service)
-        run: python3 app/tool/patch_android_manifest.py app/android/app/src/main/AndroidManifest.xml
+      - name: Patch Android project (permissions, media service, FLAG_SECURE)
+        run: python3 app/tool/patch_android_project.py app/android
 
       - name: Get dependencies
         working-directory: app
