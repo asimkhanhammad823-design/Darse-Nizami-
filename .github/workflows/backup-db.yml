@@ -1,0 +1,51 @@
+# Weekly backup of the D1 database (all darjas, books, lectures, markers and
+# users) as a downloadable SQL file, kept for 90 days. Audio files live in
+# Backblaze B2 and are not part of this backup.
+#
+# Needs the same CLOUDFLARE_API_TOKEN secret as deploy-worker.yml.
+# Restore with: npx wrangler d1 execute dars_db --remote --file=backup.sql
+# (into a freshly-created empty database).
+
+name: Backup Database
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 5" # every Friday 03:00 UTC
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Check secret is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN secret is not set. See SETUP.md for the one-time setup."
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Export database
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler d1 export dars_db --remote --output=backup.sql
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dars-db-backup
+          path: worker/backup.sql
+          retention-days: 90

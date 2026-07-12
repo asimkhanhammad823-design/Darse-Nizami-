@@ -55,9 +55,15 @@ Upar **Users** kholen:
 2. App khol kar apna **access code** likhen.
 3. Darja → Kitab → Lecture chunen aur sunen:
    - Phone lock hone par bhi audio chalta rahega (lock-screen controls).
-   - Speed 1x / 1.25x / 1.5x / 2x, 15-second aage/peechhe.
-   - Jahan chhora tha, agli baar wahi se shuru hoga.
-   - Screen par bara **Safa** number audio ke sath badalta rahega.
+   - Speed 1x / 1.25x / 1.5x / 2x, 10-second aage/peechhe.
+   - Jahan chhora tha, agli baar wahi se shuru hoga — aur home screen ka
+     **Continue listening** card aakhri dars foran khol deta hai.
+   - Lecture list mein har dars ke neeche progress bar dikhti hai (kitna
+     sun chuke hain).
+   - Screen par bara **Safa** number audio ke sath badalta rahega, aur
+     **Safa list** button se kisi bhi safa par seedha jump kar sakte hain.
+   - **Sleep timer** (chand ka nishan): 15/30/60 minute baad audio khud
+     ruk jayegi — raat ko sunne ke liye.
 4. Screenshot / screen-recording app ke andar kaam nahi karegi — yeh jaan
    boojh kar band hai taake audio mehfooz rahe.
 

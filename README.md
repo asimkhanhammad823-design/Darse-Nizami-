@@ -55,12 +55,17 @@ Give admins [GUIDE.md](GUIDE.md) — a simple usage guide in Urdu.
   mark-current-time button; the app shows the current Safa number as the
   audio plays.
 - **Resume playback** — the app remembers where each student left off in
-  every lecture (stored on-device only).
+  every lecture (stored on-device only), shows per-lecture progress bars,
+  and offers a "Continue listening" card on the home screen.
+- **Safa navigation & sleep timer** — jump straight to where any page
+  starts from the player's page list; auto-pause after 15/30/60 minutes.
+- **Weekly database backups** — a GitHub Action exports the D1 database
+  every Friday as a downloadable artifact (kept 90 days).
 - **Self-cleaning storage** — deleting a lecture (or a whole book/darja)
   also deletes the audio files from B2, so the free 10 GB never fills up
   with orphans.
 - **Background playback** — lock-screen controls, speed control
-  (1x/1.25x/1.5x/2x), 15s skip buttons.
+  (1x/1.25x/1.5x/2x), 10s skip buttons.
 
 ## Free-tier limits to keep in mind
 
