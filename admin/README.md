@@ -1,4 +1,9 @@
-# Dars-e-Nizami Admin Panel (Phase 2)
+# Dars-e-Nizami Admin Panel (Phase 2) — optional local alternative
+
+> **Note:** you probably don't need this anymore. The Worker now serves a
+> full hosted admin panel at `https://<your-worker>.workers.dev/panel` that
+> works from any browser with no installation — see the worker README.
+> This FastAPI panel remains as a local alternative.
 
 A small local tool (FastAPI + server-rendered HTML) you run on your own PC only
 when adding content. It talks to the Cloudflare Worker (Phase 1) for all data,
@@ -62,6 +67,10 @@ Open http://localhost:8000 in your browser, log in with your admin access code.
    audio player (streamed via the same short-lived signed URL the app uses),
    a "Mark current time" button that grabs the player's current position,
    and a table of existing markers you can edit or delete.
+5. **Users** — the "Users" link in the top bar manages access codes. Create
+   a user (leave the code blank to auto-generate a random, easy-to-read
+   code), hand the code to the student, and delete the user to revoke
+   access. You can also promote a user to admin or rename/regenerate codes.
 
 Deleting a Darja/Book cascades to everything under it (enforced by the D1
 foreign keys with `ON DELETE CASCADE`).
@@ -75,3 +84,7 @@ foreign keys with `ON DELETE CASCADE`).
 - [ ] Can add a marker with "Mark current time" while the player is playing
 - [ ] Can edit and delete markers
 - [ ] Can rename/reorder/delete Darjas, Books, and Lectures
+- [ ] Can create a student user on the Users page and log in to the app with
+      the generated code; deleting the user makes the code stop working
+- [ ] Entering a nonsense time like `ab:cd` shows a friendly error page, not
+      a crash

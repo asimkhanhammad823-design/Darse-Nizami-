@@ -9,7 +9,16 @@ class LoginScreen extends StatefulWidget {
   final ApiClient apiClient;
   final AuthStorage authStorage;
 
-  const LoginScreen({super.key, required this.apiClient, required this.authStorage});
+  /// Optional informational message shown above the form
+  /// (e.g. "Your session has expired").
+  final String? message;
+
+  const LoginScreen({
+    super.key,
+    required this.apiClient,
+    required this.authStorage,
+    this.message,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -40,8 +49,14 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       );
+    } on ApiException catch (e) {
+      setState(() {
+        _error = e.statusCode == 401
+            ? 'Invalid access code. Please try again.'
+            : e.message;
+      });
     } catch (e) {
-      setState(() => _error = 'Invalid access code. Please try again.');
+      setState(() => _error = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -59,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: kNavy,
       body: SafeArea(
         child: Center(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -82,6 +97,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (widget.message != null) ...[
+                        Text(
+                          widget.message!,
+                          style: const TextStyle(color: Colors.black54),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       TextField(
                         controller: _codeController,
                         obscureText: true,
@@ -93,7 +116,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 12),
-                        Text(_error!, style: const TextStyle(color: Colors.red)),
+                        Text(
+                          _error!,
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                       const SizedBox(height: 20),
                       SizedBox(

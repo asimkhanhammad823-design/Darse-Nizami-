@@ -12,7 +12,7 @@
     {% for l in lectures %}
     <tr>
       <td><a href="/lectures/{{ l.id }}?title={{ l.title | urlencode }}&book_id={{ book_id }}">{{ l.title }}</a></td>
-      <td>{{ l.duration_seconds if l.duration_seconds is not none else "-" }}s</td>
+      <td>{{ l.duration_seconds | mmss }}</td>
       <td>{{ l.sort_order }}</td>
       <td>
         <form method="post" action="/lectures/{{ l.id }}/delete" onsubmit="return confirm('Delete this lecture and its markers?');">

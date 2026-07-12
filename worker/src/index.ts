@@ -1,6 +1,7 @@
-import { AwsClient } from "aws4fetch";
 import { signJwt, verifyJwt, type JwtPayload } from "./jwt";
 import { handleAdminRoute } from "./admin";
+import { signStreamUrl } from "./b2";
+import { PANEL_HTML } from "./panel";
 
 export interface Env {
   DB: D1Database;
@@ -13,12 +14,19 @@ export interface Env {
 }
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
-const STREAM_URL_TTL_SECONDS = 120;
+const STREAM_URL_TTL_SECONDS = 600; // long enough to survive brief pauses; refreshed by the app on failure
+
+const CORS_HEADERS: Record<string, string> = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "access-control-allow-headers": "authorization, content-type",
+  "access-control-max-age": "86400",
+};
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...CORS_HEADERS },
   });
 }
 
@@ -37,21 +45,41 @@ async function requireAuth(request: Request, env: Env): Promise<JwtPayload | nul
   return verifyJwt(match[1], env.JWT_SECRET);
 }
 
+// Best-effort brute-force protection for /login. Per-isolate memory (not
+// shared globally), which is fine: it makes bulk code-guessing impractical
+// without needing any paid storage.
+const loginAttempts = new Map<string, number[]>();
+const LOGIN_WINDOW_MS = 5 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 10;
+
+function loginRateLimited(ip: string): boolean {
+  const now = Date.now();
+  if (loginAttempts.size > 10_000) loginAttempts.clear();
+  const recent = (loginAttempts.get(ip) ?? []).filter((t) => now - t < LOGIN_WINDOW_MS);
+  recent.push(now);
+  loginAttempts.set(ip, recent);
+  return recent.length > LOGIN_MAX_ATTEMPTS;
+}
+
 async function handleLogin(request: Request, env: Env): Promise<Response> {
+  const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+  if (loginRateLimited(ip)) {
+    return json({ error: "Too many login attempts. Please wait a few minutes and try again." }, 429);
+  }
   let body: { access_code?: string };
   try {
     body = await request.json();
   } catch {
     return badRequest("Invalid JSON body");
   }
-  const accessCode = body.access_code?.trim();
+  const accessCode = typeof body.access_code === "string" ? body.access_code.trim() : "";
   if (!accessCode) return badRequest("access_code is required");
 
   const user = await env.DB.prepare(
-    "SELECT id, access_code, is_admin FROM app_user WHERE access_code = ?"
+    "SELECT id, access_code, name, is_admin FROM app_user WHERE access_code = ?"
   )
     .bind(accessCode)
-    .first<{ id: number; access_code: string; is_admin: number }>();
+    .first<{ id: number; access_code: string; name: string | null; is_admin: number }>();
 
   if (!user) return unauthorized("Invalid access code");
 
@@ -62,7 +90,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
   };
   const token = await signJwt(payload, env.JWT_SECRET);
-  return json({ token, is_admin: !!user.is_admin });
+  return json({ token, is_admin: !!user.is_admin, name: user.name });
 }
 
 async function handleDarajas(env: Env): Promise<Response> {
@@ -106,62 +134,81 @@ async function handleStreamUrl(env: Env, lectureId: string): Promise<Response> {
     .first<{ audio_key: string }>();
   if (!lecture) return json({ error: "Lecture not found" }, 404);
 
-  const client = new AwsClient({
-    accessKeyId: env.B2_KEY_ID,
-    secretAccessKey: env.B2_APPLICATION_KEY,
-    service: "s3",
-    region: env.B2_REGION,
-  });
+  const url = await signStreamUrl(env, lecture.audio_key, STREAM_URL_TTL_SECONDS);
+  return json({ url, expires_in: STREAM_URL_TTL_SECONDS });
+}
 
-  const endpoint = `https://${env.B2_ENDPOINT}/${env.B2_BUCKET}/${encodeURIComponent(lecture.audio_key)}`;
+async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const url = new URL(request.url);
+  const { pathname } = url;
+  const method = request.method;
 
-  const signedRequest = await client.sign(
-    new Request(`${endpoint}?X-Amz-Expires=${STREAM_URL_TTL_SECONDS}`, { method: "GET" }),
-    { aws: { signQuery: true } }
-  );
+  if (method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
 
-  return json({ url: signedRequest.url, expires_in: STREAM_URL_TTL_SECONDS });
+  if (method === "GET" && pathname === "/health") {
+    return json({ ok: true });
+  }
+
+  // The hosted admin panel. Serving the page needs no auth — every data
+  // call it makes goes through the normal admin-token checks below.
+  if (method === "GET" && (pathname === "/panel" || pathname === "/panel/")) {
+    return new Response(PANEL_HTML, {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+
+  if (method === "POST" && pathname === "/login") {
+    return handleLogin(request, env);
+  }
+
+  // Everything below requires a valid session token.
+  const auth = await requireAuth(request, env);
+  if (!auth) return unauthorized();
+
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    if (!auth.is_admin) return json({ error: "Admin access required" }, 403);
+    const adminResponse = await handleAdminRoute(request, env, ctx, pathname, auth);
+    if (adminResponse) return withCors(adminResponse);
+    return json({ error: "Not found" }, 404);
+  }
+
+  if (method === "GET" && pathname === "/darajas") {
+    return handleDarajas(env);
+  }
+
+  let m: RegExpMatchArray | null;
+
+  m = pathname.match(/^\/darajas\/(\d+)\/books$/);
+  if (method === "GET" && m) return handleBooksForDaraja(env, m[1]);
+
+  m = pathname.match(/^\/books\/(\d+)\/lectures$/);
+  if (method === "GET" && m) return handleLecturesForBook(env, m[1]);
+
+  m = pathname.match(/^\/lectures\/(\d+)\/markers$/);
+  if (method === "GET" && m) return handleMarkersForLecture(env, m[1]);
+
+  m = pathname.match(/^\/lectures\/(\d+)\/stream-url$/);
+  if (method === "GET" && m) return handleStreamUrl(env, m[1]);
+
+  return json({ error: "Not found" }, 404);
+}
+
+function withCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(CORS_HEADERS)) headers.set(k, v);
+  return new Response(response.body, { status: response.status, headers });
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    const { pathname } = url;
-    const method = request.method;
-
-    if (method === "POST" && pathname === "/login") {
-      return handleLogin(request, env);
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    try {
+      return await route(request, env, ctx);
+    } catch (err) {
+      // Never leak a raw stack trace to clients; log it for `wrangler tail`.
+      console.error("Unhandled error:", err);
+      return json({ error: "Internal server error" }, 500);
     }
-
-    // Everything below requires a valid session token.
-    const auth = await requireAuth(request, env);
-    if (!auth) return unauthorized();
-
-    if (pathname.startsWith("/admin/")) {
-      if (!auth.is_admin) return json({ error: "Admin access required" }, 403);
-      const adminResponse = await handleAdminRoute(request, env, pathname);
-      if (adminResponse) return adminResponse;
-      return json({ error: "Not found" }, 404);
-    }
-
-    if (method === "GET" && pathname === "/darajas") {
-      return handleDarajas(env);
-    }
-
-    let m: RegExpMatchArray | null;
-
-    m = pathname.match(/^\/darajas\/(\d+)\/books$/);
-    if (method === "GET" && m) return handleBooksForDaraja(env, m[1]);
-
-    m = pathname.match(/^\/books\/(\d+)\/lectures$/);
-    if (method === "GET" && m) return handleLecturesForBook(env, m[1]);
-
-    m = pathname.match(/^\/lectures\/(\d+)\/markers$/);
-    if (method === "GET" && m) return handleMarkersForLecture(env, m[1]);
-
-    m = pathname.match(/^\/lectures\/(\d+)\/stream-url$/);
-    if (method === "GET" && m) return handleStreamUrl(env, m[1]);
-
-    return json({ error: "Not found" }, 404);
   },
 };
