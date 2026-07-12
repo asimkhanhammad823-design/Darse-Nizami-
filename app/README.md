@@ -45,12 +45,14 @@ folders, it does not overwrite our existing Dart code.
 flutter pub get
 ```
 
-## 3. Patch the generated AndroidManifest.xml
+## 3. Patch the generated Android project
 
-Easiest: run the provided script (idempotent, safe to re-run):
+Easiest: run the provided script (idempotent, safe to re-run). It adds the
+manifest permissions/components below AND sets `FLAG_SECURE` natively in
+`MainActivity.kt` (screenshot/recording block):
 
 ```powershell
-python tool\patch_android_manifest.py android\app\src\main\AndroidManifest.xml
+python tool\patch_android_project.py android
 ```
 
 Or do it by hand: open `android/app/src/main/AndroidManifest.xml` in a text
@@ -132,11 +134,11 @@ flutter run --dart-define=WORKER_BASE_URL=https://your-worker.workers.dev
   - If the signed URL expires mid-session (~120s) and a seek/request fails,
     the app transparently fetches a fresh URL and resumes from the same
     position
-- `FLAG_SECURE` set once at app startup (`main.dart`), which covers every
-  screen since a Flutter app runs in a single Android Activity — blocks
-  screenshots and screen recording at the OS level (via the maintained
-  `flutter_windowmanager_plus` plugin; the call is wrapped in try/catch so a
-  plugin failure can never block app startup)
+- `FLAG_SECURE` set natively in `MainActivity.kt` (applied by
+  `tool/patch_android_project.py`), which covers every screen since a
+  Flutter app runs in a single Android Activity — blocks screenshots and
+  screen recording at the OS level, from before the first frame, with no
+  plugin dependency at all
 - No download or share button anywhere; audio is only ever played from the
   in-memory signed URL
 - **Resume playback** — the app remembers your position in each lecture

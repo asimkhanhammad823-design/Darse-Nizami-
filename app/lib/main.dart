@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 
 import 'api/api_client.dart';
@@ -15,14 +14,9 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Blocks screenshots and screen recording at the OS level for the whole
-  // app (a Flutter app runs in a single Activity, so one call here secures
-  // every screen). Must never prevent startup if the platform call fails.
-  try {
-    await FlutterWindowManagerPlus.addFlags(FlutterWindowManagerPlus.FLAG_SECURE);
-  } catch (_) {
-    // Non-Android platform or plugin failure — continue without FLAG_SECURE.
-  }
+  // Screenshot/screen-recording blocking (FLAG_SECURE) is applied natively
+  // in MainActivity.kt — see app/tool/patch_android_project.py — so it takes
+  // effect before the first frame and needs no plugin.
 
   // Enables background playback + lock-screen controls for just_audio.
   await JustAudioBackground.init(
