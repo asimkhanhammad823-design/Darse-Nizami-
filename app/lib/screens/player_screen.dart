@@ -31,8 +31,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   StreamSubscription<ProcessingState>? _processingSubscription;
   int _lastSavedSeconds = -1;
   bool _recovering = false;
+  Timer? _sleepTimer;
+  int? _sleepMinutes;
 
   static const _speeds = [1.0, 1.25, 1.5, 2.0];
+  static const _sleepOptions = [15, 30, 60];
 
   @override
   void initState() {
@@ -49,6 +52,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       final markers = await widget.apiClient.getMarkers(widget.lecture.id);
       if (!mounted) return;
       setState(() => _markers = markers);
+      // Remember this as the most recent lecture for the home screen's
+      // "continue listening" card.
+      unawaited(_progressStore.saveLastPlayed(widget.lecture));
 
       // Resume where the student left off last time (kept on-device only).
       final savedSeconds = await _progressStore.readPosition(widget.lecture.id);
@@ -135,8 +141,49 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _errorSubscription?.cancel();
     _positionSubscription?.cancel();
     _processingSubscription?.cancel();
+    _sleepTimer?.cancel();
     _player.dispose();
     super.dispose();
+  }
+
+  void _setSleepTimer(int? minutes) {
+    _sleepTimer?.cancel();
+    setState(() => _sleepMinutes = minutes);
+    if (minutes != null) {
+      _sleepTimer = Timer(Duration(minutes: minutes), () {
+        _player.pause();
+        if (mounted) setState(() => _sleepMinutes = null);
+      });
+    }
+  }
+
+  /// Bottom sheet listing every page marker so the student can jump straight
+  /// to where a given safa starts.
+  void _showPageList() {
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: _markers.length,
+            itemBuilder: (context, index) {
+              final marker = _markers[index];
+              return ListTile(
+                leading: const Icon(Icons.menu_book, color: kNavy),
+                title: Text('Safa ${marker.pageNumber}'),
+                trailing: Text(_formatDuration(Duration(seconds: marker.timeSeconds))),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _player.seek(Duration(seconds: marker.timeSeconds));
+                  _player.play();
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   String _formatDuration(Duration d) {
@@ -292,8 +339,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
             children: [
               IconButton(
                 iconSize: 36,
-                icon: const Icon(Icons.replay_15),
-                onPressed: () => _seekRelative(-15),
+                icon: const Icon(Icons.replay_10),
+                onPressed: () => _seekRelative(-10),
               ),
               const SizedBox(width: 16),
               StreamBuilder<PlayerState>(
@@ -317,8 +364,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
               const SizedBox(width: 16),
               IconButton(
                 iconSize: 36,
-                icon: const Icon(Icons.forward_15),
-                onPressed: () => _seekRelative(15),
+                icon: const Icon(Icons.forward_10),
+                onPressed: () => _seekRelative(10),
               ),
             ],
           ),
@@ -334,6 +381,40 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 onSelected: (_) => _setSpeed(speed),
               );
             }).toList(),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_markers.isNotEmpty)
+                TextButton.icon(
+                  icon: const Icon(Icons.menu_book),
+                  label: const Text('Safa list'),
+                  onPressed: _showPageList,
+                ),
+              PopupMenuButton<int>(
+                tooltip: 'Sleep timer',
+                onSelected: (minutes) => _setSleepTimer(minutes == 0 ? null : minutes),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 0, child: Text('Timer off')),
+                  for (final minutes in _sleepOptions)
+                    PopupMenuItem(value: minutes, child: Text('Stop after $minutes min')),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.bedtime, size: 20, color: _sleepMinutes != null ? kTeal : kNavy),
+                      const SizedBox(width: 6),
+                      Text(
+                        _sleepMinutes != null ? 'Sleep: $_sleepMinutes min' : 'Sleep timer',
+                        style: const TextStyle(color: kNavy),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

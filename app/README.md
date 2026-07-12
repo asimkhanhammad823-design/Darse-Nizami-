@@ -126,7 +126,8 @@ flutter run --dart-define=WORKER_BASE_URL=https://your-worker.workers.dev
   - Big "Safa" (page) number that updates live from the page markers, per
     the page-display rule (largest marker time ≤ current position; nothing
     shown before the first marker)
-  - Play/pause, 15s back/forward, seek bar, speed control (1x/1.25x/1.5x/2x)
+  - Play/pause, 10s back/forward, seek bar, speed control (1x/1.25x/1.5x/2x)
+  - Safa list (jump to where any page starts) and a 15/30/60-minute sleep timer
   - Background playback + lock-screen controls via `just_audio_background`
   - If the signed URL expires mid-session (~120s) and a seek/request fails,
     the app transparently fetches a fresh URL and resumes from the same
