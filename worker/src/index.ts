@@ -45,7 +45,27 @@ async function requireAuth(request: Request, env: Env): Promise<JwtPayload | nul
   return verifyJwt(match[1], env.JWT_SECRET);
 }
 
+// Best-effort brute-force protection for /login. Per-isolate memory (not
+// shared globally), which is fine: it makes bulk code-guessing impractical
+// without needing any paid storage.
+const loginAttempts = new Map<string, number[]>();
+const LOGIN_WINDOW_MS = 5 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 10;
+
+function loginRateLimited(ip: string): boolean {
+  const now = Date.now();
+  if (loginAttempts.size > 10_000) loginAttempts.clear();
+  const recent = (loginAttempts.get(ip) ?? []).filter((t) => now - t < LOGIN_WINDOW_MS);
+  recent.push(now);
+  loginAttempts.set(ip, recent);
+  return recent.length > LOGIN_MAX_ATTEMPTS;
+}
+
 async function handleLogin(request: Request, env: Env): Promise<Response> {
+  const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+  if (loginRateLimited(ip)) {
+    return json({ error: "Too many login attempts. Please wait a few minutes and try again." }, 429);
+  }
   let body: { access_code?: string };
   try {
     body = await request.json();

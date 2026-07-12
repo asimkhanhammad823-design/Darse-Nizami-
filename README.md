@@ -24,12 +24,24 @@ logged-in users — there is no public link to any audio file.
 
 ## Setup order
 
+**Start with [SETUP.md](SETUP.md)** — the complete one-time checklist
+(deploy, first admin, GitHub auto-deploy, cloud APK build). In short:
+
 1. **`worker/`** — deploy the API + hosted admin panel
    (see [worker/README.md](worker/README.md)).
 2. **Open `/panel`** in a browser, log in with your admin access code, and
    create Darjas/Books/Lectures and student access codes.
-3. **`app/`** — build the Android app and hand it to students along with
-   their access codes (see [app/README.md](app/README.md)).
+3. **Build the APK from the GitHub Actions tab** (no Flutter needed) and
+   hand it to students with their access codes.
+
+Give admins [GUIDE.md](GUIDE.md) — a simple usage guide in Urdu.
+
+## Automation (GitHub Actions)
+
+- **Deploy Worker** — pushes touching `worker/` auto-deploy once the
+  `CLOUDFLARE_API_TOKEN` secret is set (see SETUP.md step 3).
+- **Build Android APK** — builds the installable student APK in the cloud;
+  download it from the workflow run's Artifacts. No local Flutter setup.
 
 ## Key features
 
@@ -63,7 +75,6 @@ logged-in users — there is no public link to any audio file.
 
 ## Ideas for later (not yet implemented)
 
-- Rate-limit `/login` (e.g. Cloudflare WAF free rules) against code guessing.
 - Per-device binding of access codes to stop code sharing.
 - Server-side listening progress so a student's position follows them across
   devices.
