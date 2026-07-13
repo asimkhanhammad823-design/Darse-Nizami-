@@ -336,8 +336,13 @@ async function uploadAudio(request: Request, env: Env): Promise<Response> {
     );
   }
   const contentLength = request.headers.get("content-length");
-  if (!contentLength || Number(contentLength) <= 0) {
-    return badRequest("The uploaded file is empty");
+  const size = Number(contentLength);
+  if (!contentLength || !Number.isFinite(size) || size <= 0) {
+    return badRequest("The uploaded file is empty or its size is unknown");
+  }
+  const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500 MB per file
+  if (size > MAX_UPLOAD_BYTES) {
+    return json({ error: "File too large (max 500 MB). Please split the lecture into parts." }, 413);
   }
   if (!request.body) return badRequest("Missing request body");
 
@@ -345,6 +350,10 @@ async function uploadAudio(request: Request, env: Env): Promise<Response> {
 
   // Stream the incoming body straight to B2 without buffering it in memory.
   // UNSIGNED-PAYLOAD lets aws4fetch sign the request without hashing the body.
+  // `duplex: "half"` is REQUIRED by the runtime whenever the request body is
+  // a stream (without it, constructing the Request throws); the explicit
+  // content-length keeps the upload fixed-length so the SigV4 signature that
+  // covers it matches what B2 receives.
   const signed = await b2Client(env).sign(
     new Request(objectUrl(env, key), {
       method: "PUT",
@@ -354,7 +363,8 @@ async function uploadAudio(request: Request, env: Env): Promise<Response> {
         "x-amz-content-sha256": "UNSIGNED-PAYLOAD",
       },
       body: request.body,
-    })
+      duplex: "half",
+    } as RequestInit & { duplex: "half" })
   );
   const b2Response = await fetch(signed);
   if (!b2Response.ok) {
@@ -369,10 +379,21 @@ async function uploadAudio(request: Request, env: Env): Promise<Response> {
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
 function generateAccessCode(length = 8): string {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
+  // Rejection sampling to avoid modulo bias: 248 = floor(256/31)*31, so bytes
+  // >= 248 are discarded, keeping every code character equally likely.
+  const n = CODE_ALPHABET.length;
+  const limit = Math.floor(256 / n) * n;
   let code = "";
-  for (const b of bytes) code += CODE_ALPHABET[b % CODE_ALPHABET.length];
+  while (code.length < length) {
+    const buf = new Uint8Array(length);
+    crypto.getRandomValues(buf);
+    for (const b of buf) {
+      if (b < limit) {
+        code += CODE_ALPHABET[b % n];
+        if (code.length === length) break;
+      }
+    }
+  }
   return code;
 }
 
@@ -413,7 +434,7 @@ async function createUser(request: Request, env: Env): Promise<Response> {
   ) as Promise<Response>;
 }
 
-async function updateUser(request: Request, env: Env, id: string): Promise<Response> {
+async function updateUser(request: Request, env: Env, id: string, auth: JwtPayload): Promise<Response> {
   const body = await parseBody<{ name?: unknown; access_code?: unknown; is_admin?: unknown }>(request);
   if (!body) return badRequest("Invalid JSON body");
   const existing = await env.DB.prepare(
@@ -431,6 +452,10 @@ async function updateUser(request: Request, env: Env, id: string): Promise<Respo
     accessCode = body.access_code.trim();
   }
   const isAdmin = body.is_admin !== undefined ? (body.is_admin ? 1 : 0) : existing.is_admin;
+  // Don't let an admin remove their own admin rights and lock themselves out.
+  if (Number(id) === auth.sub && isAdmin === 0) {
+    return badRequest("You cannot remove admin rights from the account you are logged in with");
+  }
   return runOrConflict(async () => {
     await env.DB.prepare("UPDATE app_user SET access_code = ?, name = ?, is_admin = ? WHERE id = ?")
       .bind(accessCode, name, isAdmin, id)
@@ -485,7 +510,7 @@ export async function handleAdminRoute(
   if (method === "GET" && pathname === "/admin/users") return listUsers(env);
   if (method === "POST" && pathname === "/admin/users") return createUser(request, env);
   m = pathname.match(/^\/admin\/users\/(\d+)$/);
-  if (m && method === "PUT") return updateUser(request, env, m[1]);
+  if (m && method === "PUT") return updateUser(request, env, m[1], auth);
   if (m && method === "DELETE") return deleteUser(env, m[1], auth);
 
   return null;

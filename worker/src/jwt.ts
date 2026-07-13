@@ -43,21 +43,33 @@ export async function signJwt(payload: JwtPayload, secret: string): Promise<stri
 }
 
 export async function verifyJwt(token: string, secret: string): Promise<JwtPayload | null> {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const [headerB64, payloadB64, sigB64] = parts;
-  const data = `${headerB64}.${payloadB64}`;
-  const key = await hmacKey(secret);
-  const valid = await crypto.subtle.verify(
-    "HMAC",
-    key,
-    base64urlDecode(sigB64).buffer as ArrayBuffer,
-    new TextEncoder().encode(data)
-  );
-  if (!valid) return null;
+  // Any malformed/garbage token must resolve to a clean null (→ 401),
+  // never an exception (which would surface as a 500). So the base64
+  // decoding + JSON parsing all live inside this try.
   try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const [headerB64, payloadB64, sigB64] = parts;
+
+    // Only accept the algorithm we actually issue (defense in depth against
+    // any future "alg" confusion).
+    const header = JSON.parse(new TextDecoder().decode(base64urlDecode(headerB64))) as {
+      alg?: string;
+    };
+    if (header.alg !== "HS256") return null;
+
+    const data = `${headerB64}.${payloadB64}`;
+    const key = await hmacKey(secret);
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64urlDecode(sigB64).buffer as ArrayBuffer,
+      new TextEncoder().encode(data)
+    );
+    if (!valid) return null;
+
     const payload = JSON.parse(new TextDecoder().decode(base64urlDecode(payloadB64))) as JwtPayload;
-    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+    if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
   } catch {
     return null;

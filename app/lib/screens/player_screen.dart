@@ -31,8 +31,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   StreamSubscription<ProcessingState>? _processingSubscription;
   int _lastSavedSeconds = -1;
   bool _recovering = false;
+  int _recoveryAttempts = 0;
   Timer? _sleepTimer;
   int? _sleepMinutes;
+
+  // Cap how many times we silently refetch a fresh stream URL after a
+  // playback error, so a persistently-broken stream can't turn into a tight
+  // request loop against the server.
+  static const _maxRecoveryAttempts = 3;
 
   static const _speeds = [1.0, 1.25, 1.5, 2.0];
   static const _sleepOptions = [15, 30, 60];
@@ -44,12 +50,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _init() async {
+    // Cancel any subscriptions from a previous attempt (e.g. Retry) so they
+    // aren't leaked/duplicated when we re-subscribe below.
+    await _errorSubscription?.cancel();
+    await _positionSubscription?.cancel();
+    await _processingSubscription?.cancel();
+    _errorSubscription = null;
+    _positionSubscription = null;
+    _processingSubscription = null;
+
     setState(() {
       _loading = true;
       _error = null;
     });
+    _recoveryAttempts = 0;
     try {
       final markers = await widget.apiClient.getMarkers(widget.lecture.id);
+      // Defensive: the "Safa" logic and the page list both assume markers are
+      // in ascending time order. The API already sorts, but re-sort locally
+      // so a change there can never show the wrong page.
+      markers.sort((a, b) => a.timeSeconds.compareTo(b.timeSeconds));
       if (!mounted) return;
       setState(() => _markers = markers);
       // Remember this as the most recent lecture for the home screen's
@@ -74,11 +94,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
         (_) {},
         onError: (Object e, StackTrace st) async {
           if (_recovering) return;
+          if (_recoveryAttempts >= _maxRecoveryAttempts) {
+            // Give up silently refetching; show the retry UI instead of
+            // hammering the server in a tight loop.
+            if (mounted) setState(() => _error = 'Playback stopped. Please try again.');
+            return;
+          }
           _recovering = true;
+          _recoveryAttempts++;
           final position = _player.position;
           final wasPlaying = _player.playing;
           try {
             await _loadAudioSource(initialPosition: position, autoplay: wasPlaying);
+            _recoveryAttempts = 0; // recovered — reset the counter
           } catch (_) {
             // Genuine failure (no internet, lecture removed, etc.)
           } finally {

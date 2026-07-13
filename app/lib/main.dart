@@ -77,6 +77,7 @@ class _StartupGateState extends State<_StartupGate> {
 
   Future<void> _loadToken() async {
     final token = await _authStorage.readToken();
+    if (token != null) _apiClient.setToken(token);
     setState(() {
       _token = token;
       _checking = false;
@@ -112,7 +113,6 @@ class _StartupGateState extends State<_StartupGate> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_token != null) {
-      _apiClient.setToken(_token);
       return HomeScreen(apiClient: _apiClient, authStorage: _authStorage);
     }
     return LoginScreen(apiClient: _apiClient, authStorage: _authStorage);
