@@ -85,7 +85,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
           initialPosition = Duration(seconds: savedSeconds);
         }
       }
-      await _loadAudioSource(initialPosition: initialPosition);
+      // Guard the audio load with a timeout so a stalled stream shows a
+      // friendly Retry instead of spinning forever.
+      await _loadAudioSource(initialPosition: initialPosition)
+          .timeout(const Duration(seconds: 30));
 
       // The signed stream URL eventually expires. If a later seek/request
       // fails because of that, transparently fetch a fresh URL and resume
