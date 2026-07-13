@@ -395,6 +395,8 @@ async function markersView(lectureId, title, bookId, bookName, darajaId, darajaN
       '<form class="inline-form" data-update-marker="' + m.id + '">' +
       '<input class="small" name="time_mmss" value="' + fmtMmss(m.time_seconds) + '" />' +
       '<input class="small" type="number" name="page_number" value="' + m.page_number + '" min="1" />' +
+      '<label class="hint">' + (m.has_image ? "🖼️ image set — replace:" : "add image:") + "</label>" +
+      '<input type="file" name="image" accept="image/*" />' +
       "<button type=\\"submit\\">Save</button></form></td>" +
       '<td><button class="danger" data-del-marker="' + m.id + '">Delete</button></td></tr>';
   }
@@ -404,7 +406,7 @@ async function markersView(lectureId, title, bookId, bookName, darajaId, darajaN
     "<h1>" + esc(title) + "</h1>" +
     '<div class="card"><audio id="player" controls preload="metadata" src="' + esc(stream.url) + '"></audio>' +
     '<p class="hint">The stream link expires after ' + Math.round(stream.expires_in / 60) + " minutes — reload this page if playback stops.</p></div>" +
-    "<table><thead><tr><th>Time / Page</th><th></th></tr></thead><tbody>" +
+    "<table><thead><tr><th>Time / Page / Image</th><th></th></tr></thead><tbody>" +
     (rows || '<tr><td colspan=2 class="hint">No markers yet — add the first one below.</td></tr>') +
     "</tbody></table>" +
     '<div class="card"><h2>Add Marker</h2><form id="add-marker">' +
@@ -413,7 +415,10 @@ async function markersView(lectureId, title, bookId, bookName, darajaId, darajaN
     '<input class="small" id="time_mmss" placeholder="10:00" required />' +
     '<button type="button" id="mark-now">Mark current time</button></div>' +
     '<label>Page number</label><input type="number" id="page_number" min="1" required />' +
-    "<button type=\\"submit\\">Add Marker</button></form></div>";
+    '<label>Page image (optional — jpg/png; shown to students on this page)</label>' +
+    '<input type="file" id="page_image" accept="image/*" />' +
+    '<progress id="marker-progress" value="0" max="1" style="display:none"></progress>' +
+    '<button type="submit" id="add-marker-btn">Add Marker</button></form></div>';
   document.getElementById("mark-now").addEventListener("click", function () {
     var player = document.getElementById("player");
     document.getElementById("time_mmss").value = fmtMmss(Math.floor(player.currentTime));
@@ -423,20 +428,34 @@ async function markersView(lectureId, title, bookId, bookName, darajaId, darajaN
     var t = parseMmss(document.getElementById("time_mmss").value);
     var page = parseInt(document.getElementById("page_number").value, 10);
     if (t == null) { showError(new Error("Time must look like 12:30 (mm:ss) or plain seconds.")); return; }
+    var btn = document.getElementById("add-marker-btn");
+    var bar = document.getElementById("marker-progress");
+    var file = document.getElementById("page_image").files[0];
+    btn.disabled = true;
     try {
-      await api("POST", "/admin/lectures/" + lectureId + "/markers", { time_seconds: t, page_number: page });
+      var body = { time_seconds: t, page_number: page };
+      if (file) {
+        bar.style.display = "block";
+        var up = await uploadWithProgress(file, function (p) { bar.value = p; });
+        body.image_key = up.key;
+      }
+      await api("POST", "/admin/lectures/" + lectureId + "/markers", body);
       render();
-    } catch (err) { showError(err); }
+    } catch (err) { btn.disabled = false; bar.style.display = "none"; showError(err); }
   });
   app.querySelectorAll("[data-update-marker]").forEach(function (f) {
     f.addEventListener("submit", async function (e) {
       e.preventDefault();
       var t = parseMmss(f.time_mmss.value);
       if (t == null) { showError(new Error("Time must look like 12:30 (mm:ss) or plain seconds.")); return; }
+      var file = f.image.files[0];
       try {
-        await api("PUT", "/admin/markers/" + f.dataset.updateMarker, {
-          time_seconds: t, page_number: parseInt(f.page_number.value, 10),
-        });
+        var body = { time_seconds: t, page_number: parseInt(f.page_number.value, 10) };
+        if (file) {
+          var up = await uploadWithProgress(file, function () {});
+          body.image_key = up.key;
+        }
+        await api("PUT", "/admin/markers/" + f.dataset.updateMarker, body);
         render();
       } catch (err) { showError(err); }
     });

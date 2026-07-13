@@ -123,4 +123,11 @@ class ApiClient {
     final data = await _get('/lectures/$lectureId/stream-url') as Map<String, dynamic>;
     return data['url'] as String;
   }
+
+  /// Signed URL for a marker's page image. Throws ApiException if the marker
+  /// has no image (404).
+  Future<String> getMarkerImageUrl(int markerId) async {
+    final data = await _get('/markers/$markerId/image-url') as Map<String, dynamic>;
+    return data['url'] as String;
+  }
 }

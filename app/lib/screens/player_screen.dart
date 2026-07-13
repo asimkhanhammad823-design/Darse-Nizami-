@@ -34,6 +34,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Timer? _sleepTimer;
   int? _sleepMinutes;
 
+  // Signed image URLs fetched lazily per marker (once it becomes the active
+  // page), cached so we don't refetch. markerId → url. A value of '' means a
+  // fetch is in flight or failed.
+  final Map<int, String> _imageUrls = {};
+  final Set<int> _imageFetching = {};
+
   // Cap how many times we silently refetch a fresh stream URL after a
   // playback error, so a persistently-broken stream can't turn into a tight
   // request loop against the server.
@@ -242,6 +248,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await _player.setSpeed(speed);
   }
 
+  /// Fetch the signed image URL for a marker the first time its page becomes
+  /// active. Cached; failures fall back to showing the page number.
+  void _ensureImageUrl(PageMarker marker) {
+    if (_imageUrls.containsKey(marker.id) || _imageFetching.contains(marker.id)) return;
+    _imageFetching.add(marker.id);
+    widget.apiClient.getMarkerImageUrl(marker.id).then((url) {
+      if (!mounted) return;
+      setState(() {
+        _imageUrls[marker.id] = url;
+        _imageFetching.remove(marker.id);
+      });
+    }).catchError((_) {
+      if (!mounted) return;
+      setState(() => _imageFetching.remove(marker.id));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -285,33 +308,67 @@ class _PlayerScreenState extends State<PlayerScreen> {
               stream: _player.positionStream,
               builder: (context, snapshot) {
                 final position = snapshot.data ?? Duration.zero;
-                final page = PageMarker.pageAt(_markers, position.inSeconds);
-                if (page == null) {
+                final marker = PageMarker.markerAt(_markers, position.inSeconds);
+                if (marker == null) {
                   return const SizedBox.shrink();
                 }
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Safa',
-                      style: TextStyle(fontSize: 20, color: Colors.black54),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$page',
-                      style: const TextStyle(
-                        fontSize: 96,
-                        fontWeight: FontWeight.bold,
-                        color: kNavy,
-                      ),
-                    ),
-                  ],
-                );
+                // If this page has an image, show it (fetch lazily). While
+                // it loads, or if it has no image, show the big Safa number.
+                if (marker.hasImage) {
+                  _ensureImageUrl(marker);
+                  final url = _imageUrls[marker.id];
+                  if (url != null && url.isNotEmpty) {
+                    return _buildPageImage(url, marker.pageNumber);
+                  }
+                }
+                return _buildPageNumber(marker.pageNumber);
               },
             ),
           ),
         ),
         _buildControls(),
+      ],
+    );
+  }
+
+  Widget _buildPageNumber(int page) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('Safa', style: TextStyle(fontSize: 20, color: Colors.black54)),
+        const SizedBox(height: 8),
+        Text(
+          '$page',
+          style: const TextStyle(fontSize: 96, fontWeight: FontWeight.bold, color: kNavy),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPageImage(String url, int page) {
+    return Column(
+      children: [
+        Expanded(
+          child: InteractiveViewer(
+            minScale: 1,
+            maxScale: 4,
+            child: Center(
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(child: CircularProgressIndicator());
+                },
+                errorBuilder: (context, error, stack) => _buildPageNumber(page),
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text('Safa $page', style: const TextStyle(color: Colors.black54)),
+        ),
       ],
     );
   }
