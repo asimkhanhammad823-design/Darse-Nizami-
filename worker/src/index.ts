@@ -42,7 +42,19 @@ async function requireAuth(request: Request, env: Env): Promise<JwtPayload | nul
   const authHeader = request.headers.get("authorization") || "";
   const match = authHeader.match(/^Bearer\s+(.+)$/i);
   if (!match) return null;
-  return verifyJwt(match[1], env.JWT_SECRET);
+  const payload = await verifyJwt(match[1], env.JWT_SECRET);
+  if (!payload) return null;
+
+  // Re-check the user against the DB on every request so that deleting a
+  // user (or toggling their admin flag) takes effect immediately, instead
+  // of the stale value baked into the 30-day token. One indexed lookup by
+  // primary key — cheap and well within the D1 free tier.
+  const user = await env.DB.prepare("SELECT is_admin FROM app_user WHERE id = ?")
+    .bind(payload.sub)
+    .first<{ is_admin: number }>();
+  if (!user) return null; // account deleted → token no longer valid
+  payload.is_admin = !!user.is_admin; // reflect current admin status
+  return payload;
 }
 
 // Best-effort brute-force protection for /login. Per-isolate memory (not

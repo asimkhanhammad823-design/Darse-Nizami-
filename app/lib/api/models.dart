@@ -1,3 +1,22 @@
+// Defensive JSON coercion: D1 returns integers as ints, but tolerate a
+// number arriving as a double/string so a stray value never crashes a list.
+int _asInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+int? _asIntOrNull(Object? value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+String _asString(Object? value) => value?.toString() ?? '';
+
 class Daraja {
   final int id;
   final String name;
@@ -5,7 +24,7 @@ class Daraja {
   Daraja({required this.id, required this.name});
 
   factory Daraja.fromJson(Map<String, dynamic> json) {
-    return Daraja(id: json['id'] as int, name: json['name'] as String);
+    return Daraja(id: _asInt(json['id']), name: _asString(json['name']));
   }
 }
 
@@ -18,9 +37,9 @@ class Book {
 
   factory Book.fromJson(Map<String, dynamic> json) {
     return Book(
-      id: json['id'] as int,
-      darajaId: json['daraja_id'] as int,
-      name: json['name'] as String,
+      id: _asInt(json['id']),
+      darajaId: _asInt(json['daraja_id']),
+      name: _asString(json['name']),
     );
   }
 }
@@ -40,10 +59,10 @@ class Lecture {
 
   factory Lecture.fromJson(Map<String, dynamic> json) {
     return Lecture(
-      id: json['id'] as int,
-      bookId: json['book_id'] as int,
-      title: json['title'] as String,
-      durationSeconds: json['duration_seconds'] as int?,
+      id: _asInt(json['id']),
+      bookId: _asInt(json['book_id']),
+      title: _asString(json['title']),
+      durationSeconds: _asIntOrNull(json['duration_seconds']),
     );
   }
 }
@@ -61,9 +80,9 @@ class PageMarker {
 
   factory PageMarker.fromJson(Map<String, dynamic> json) {
     return PageMarker(
-      id: json['id'] as int,
-      timeSeconds: json['time_seconds'] as int,
-      pageNumber: json['page_number'] as int,
+      id: _asInt(json['id']),
+      timeSeconds: _asInt(json['time_seconds']),
+      pageNumber: _asInt(json['page_number']),
     );
   }
 

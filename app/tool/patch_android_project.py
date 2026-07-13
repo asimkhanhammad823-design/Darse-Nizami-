@@ -85,9 +85,14 @@ def patch_main_activity(android_dir: pathlib.Path) -> bool:
     source = path.read_text(encoding="utf-8")
     if "FLAG_SECURE" in source:
         return False
-    package = next(
-        line.split()[1] for line in source.splitlines() if line.startswith("package ")
-    )
+    package = None
+    for line in source.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("package "):
+            package = stripped.split()[1].rstrip(";")
+            break
+    if not package:
+        raise SystemExit(f"error: could not find a 'package' declaration in {path}")
     path.write_text(MAIN_ACTIVITY_TEMPLATE.format(package=package), encoding="utf-8")
     return True
 
