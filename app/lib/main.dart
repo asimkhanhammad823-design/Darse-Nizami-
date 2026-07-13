@@ -19,11 +19,20 @@ Future<void> main() async {
   // effect before the first frame and needs no plugin.
 
   // Enables background playback + lock-screen controls for just_audio.
-  await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.darsenizami.audio.channel',
-    androidNotificationChannelName: 'Dars-e-Nizami Playback',
-    androidNotificationOngoing: true,
-  );
+  // Must never prevent the app from starting: if this throws (e.g. a
+  // notification-channel issue on some OEM/Android version), the whole
+  // app would otherwise stay a blank screen forever, since this runs
+  // before runApp().
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.darsenizami.audio.channel',
+      androidNotificationChannelName: 'Dars-e-Nizami Playback',
+      androidNotificationOngoing: true,
+    );
+  } catch (_) {
+    // Continue without background/lock-screen controls rather than never
+    // showing the app at all.
+  }
 
   runApp(const DarsNizamiApp());
 }
