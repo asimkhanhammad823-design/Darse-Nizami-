@@ -119,7 +119,7 @@ flutter run --dart-define=WORKER_BASE_URL=https://your-worker.workers.dev
 
 ## 5. What's implemented
 
-- Login screen (access code → token, stored in `flutter_secure_storage`)
+- Login screen (username + password → token, stored in `flutter_secure_storage`)
 - Home → Darjas, tap into Books, tap into Lectures
 - Player screen:
   - Streams audio directly from the Worker's short-lived signed URL (never
@@ -159,7 +159,7 @@ flutter run --dart-define=WORKER_BASE_URL=https://your-worker.workers.dev
 ## Phase 3 test checklist
 
 - [ ] `flutter run` builds and launches on a real device or emulator
-- [ ] Login with a valid access code works; invalid code shows an error
+- [ ] Login with a valid username + password works; invalid shows an error
 - [ ] Darja → Book → Lecture navigation works
 - [ ] Audio plays; lock the phone — playback continues with lock-screen
       controls (play/pause/skip)

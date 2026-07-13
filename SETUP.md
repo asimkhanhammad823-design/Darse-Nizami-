@@ -28,13 +28,22 @@ npm run deploy                          # deploys API + /panel
 
 ## Step 2 — First admin user (one SQL command, once)
 
+Login now uses a **username + password**. Create the first admin:
+
 ```bash
 npx wrangler d1 execute dars_db --remote --command \
-  "INSERT INTO app_user (access_code, name, is_admin) VALUES ('CHOOSE-A-CODE', 'Admin', 1);"
+  "INSERT INTO app_user (access_code, username, password, name, is_admin) VALUES ('admin', 'admin', 'CHOOSE-A-PASSWORD', 'Admin', 1);"
 ```
 
-Every other user (students, more admins) is created from the panel's
-**Users** page after this — never SQL again.
+(Use your own values instead of `admin` / `CHOOSE-A-PASSWORD`.) Every other
+user — students and more admins — is created from the panel's **Users** page
+after this, never SQL again.
+
+> **Upgrading an existing install?** If you already had the old access-code
+> login, the migration copies each old code into both the username and the
+> password, so you log in the first time with
+> `username = old-code`, `password = old-code`, then change them on the
+> Users page.
 
 ## Step 3 — Auto-deploy from GitHub (optional but recommended)
 
@@ -51,21 +60,31 @@ So future updates deploy themselves without a PC:
 
 ## Step 4 — Build the student APK in the cloud (no Flutter needed)
 
-1. GitHub repo → **Actions** tab → **Build Android APK** → **Run workflow**
-   (optionally paste your worker URL if it differs from the default).
-2. When it finishes (~10 minutes), open the run → **Artifacts** →
-   download `dars-nizami-apk`.
-3. Send the `dars-nizami.apk` file inside it to students (WhatsApp/USB).
-   On the phone: tap the file → allow "install unknown apps" once → install.
+1. GitHub repo → **Actions** tab → **Build Android APK** → **Run workflow**.
+2. When it finishes (~10 minutes), the APK is published automatically to a
+   public release. From then on, **everyone downloads the app straight from
+   the landing page** (next step) — no GitHub login needed. (A copy is also
+   under the run's **Artifacts**.)
 
-## Step 5 — Hand over to the admins
+## Step 5 — One link for everything
 
-Give your admin(s) two things:
+There is now a single page that serves as the entry point:
 
-- The panel link: `https://dars-worker.<your-subdomain>.workers.dev/panel`
-- Their admin access code
+```
+https://dars-worker.<your-subdomain>.workers.dev/
+```
 
-…and point them at [GUIDE.md](GUIDE.md) (simple usage guide in Urdu).
+On it:
+- **📥 Download the App** button — students (and admins) install the Android
+  app from here.
+- **Login** (username + password) — an **admin** logs in here and lands in
+  the panel. Students don't log in on the web; they log in inside the app
+  with the username + password you give them.
+
+Hand your admin(s): this link + their username & password, and point them at
+[GUIDE.md](GUIDE.md) (simple usage guide in Urdu). Create each student on the
+panel's **Users** page (username + password auto-generate if left blank) and
+give them their two credentials.
 
 ## Free-tier housekeeping (nothing to do, just know)
 

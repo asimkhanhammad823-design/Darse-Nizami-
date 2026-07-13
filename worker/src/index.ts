@@ -78,26 +78,29 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   if (loginRateLimited(ip)) {
     return json({ error: "Too many login attempts. Please wait a few minutes and try again." }, 429);
   }
-  let body: { access_code?: string };
+  let body: { username?: string; password?: string; access_code?: string };
   try {
     body = await request.json();
   } catch {
     return badRequest("Invalid JSON body");
   }
-  const accessCode = typeof body.access_code === "string" ? body.access_code.trim() : "";
-  if (!accessCode) return badRequest("access_code is required");
+  // Accept {username,password}; also accept a legacy {access_code} that is
+  // treated as both username and password (old backfilled accounts).
+  const username = typeof body.username === "string" ? body.username.trim() : (body.access_code ?? "").trim();
+  const password = typeof body.password === "string" ? body.password : (body.access_code ?? "");
+  if (!username || !password) return badRequest("username and password are required");
 
   const user = await env.DB.prepare(
-    "SELECT id, access_code, name, is_admin FROM app_user WHERE access_code = ?"
+    "SELECT id, username, password, name, is_admin FROM app_user WHERE username = ?"
   )
-    .bind(accessCode)
-    .first<{ id: number; access_code: string; name: string | null; is_admin: number }>();
+    .bind(username)
+    .first<{ id: number; username: string; password: string; name: string | null; is_admin: number }>();
 
-  if (!user) return unauthorized("Invalid access code");
+  if (!user || user.password !== password) return unauthorized("Invalid username or password");
 
   const payload: JwtPayload = {
     sub: user.id,
-    access_code: user.access_code,
+    username: user.username,
     is_admin: !!user.is_admin,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
   };
@@ -182,9 +185,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     return json({ ok: true });
   }
 
-  // The hosted admin panel. Serving the page needs no auth — every data
-  // call it makes goes through the normal admin-token checks below.
-  if (method === "GET" && (pathname === "/panel" || pathname === "/panel/")) {
+  // The hosted landing page + admin panel. Served at both "/" (so the root
+  // URL is the app-download + login page) and "/panel". Needs no auth — every
+  // data call it makes goes through the normal admin-token checks below.
+  if (method === "GET" && (pathname === "/" || pathname === "/panel" || pathname === "/panel/")) {
     return new Response(PANEL_HTML, {
       headers: { "content-type": "text/html; charset=utf-8" },
     });
