@@ -2,6 +2,7 @@ import { signJwt, verifyJwt, type JwtPayload } from "./jwt";
 import { handleAdminRoute } from "./admin";
 import { signStreamUrl } from "./b2";
 import { PANEL_HTML } from "./panel";
+import { GUIDE_HTML } from "./guide";
 
 export interface Env {
   DB: D1Database;
@@ -190,6 +191,13 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   // data call it makes goes through the normal admin-token checks below.
   if (method === "GET" && (pathname === "/" || pathname === "/panel" || pathname === "/panel/")) {
     return new Response(PANEL_HTML, {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+
+  // Public help guide (no login) — a shareable page for admins.
+  if (method === "GET" && (pathname === "/guide" || pathname === "/guide/")) {
+    return new Response(GUIDE_HTML, {
       headers: { "content-type": "text/html; charset=utf-8" },
     });
   }
