@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 
 import 'api/api_client.dart';
 import 'screens/login_screen.dart';
@@ -17,22 +16,6 @@ Future<void> main() async {
   // Screenshot/screen-recording blocking (FLAG_SECURE) is applied natively
   // in MainActivity.kt — see app/tool/patch_android_project.py — so it takes
   // effect before the first frame and needs no plugin.
-
-  // Enables background playback + lock-screen controls for just_audio.
-  // Must never prevent the app from starting: if this throws (e.g. a
-  // notification-channel issue on some OEM/Android version), the whole
-  // app would otherwise stay a blank screen forever, since this runs
-  // before runApp().
-  try {
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.darsenizami.audio.channel',
-      androidNotificationChannelName: 'Dars-e-Nizami Playback',
-      androidNotificationOngoing: true,
-    );
-  } catch (_) {
-    // Continue without background/lock-screen controls rather than never
-    // showing the app at all.
-  }
 
   runApp(const DarsNizamiApp());
 }

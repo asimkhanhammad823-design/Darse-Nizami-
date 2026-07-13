@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 
 import '../api/api_client.dart';
 import '../api/models.dart';
@@ -148,14 +147,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _loadAudioSource({Duration? initialPosition, bool autoplay = false}) async {
     final url = await widget.apiClient.getStreamUrl(widget.lecture.id);
     await _player.setAudioSource(
-      AudioSource.uri(
-        Uri.parse(url),
-        tag: MediaItem(
-          id: widget.lecture.id.toString(),
-          title: widget.lecture.title,
-          artist: 'Dars-e-Nizami',
-        ),
-      ),
+      AudioSource.uri(Uri.parse(url)),
       initialPosition: initialPosition,
     );
     await _player.setSpeed(_speed);

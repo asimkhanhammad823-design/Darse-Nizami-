@@ -2,8 +2,8 @@
 """Patches the flutter-create generated Android project with everything this
 app needs:
 
-1. AndroidManifest.xml — permissions (internet, background audio) and the
-   just_audio_background service/receiver for lock-screen media controls.
+1. AndroidManifest.xml — the INTERNET permission (needed to stream audio),
+   which flutter create only adds for debug builds, not release.
 2. MainActivity.kt — sets FLAG_SECURE natively (blocks screenshots and
    screen recording for the whole app, before the first frame renders).
    Doing this natively avoids depending on any window-manager plugin.
@@ -20,27 +20,6 @@ import sys
 PERMISSIONS = """\
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-"""
-
-COMPONENTS = """\
-        <service
-            android:name="com.ryanheise.audioservice.AudioService"
-            android:foregroundServiceType="mediaPlayback"
-            android:exported="true">
-          <intent-filter>
-            <action android:name="android.media.browse.MediaBrowserService" />
-          </intent-filter>
-        </service>
-        <receiver
-            android:name="com.ryanheise.audioservice.MediaButtonReceiver"
-            android:exported="true">
-          <intent-filter>
-            <action android:name="android.intent.action.MEDIA_BUTTON" />
-          </intent-filter>
-        </receiver>
 """
 
 MAIN_ACTIVITY_TEMPLATE = """\
@@ -67,10 +46,6 @@ def patch_manifest(path: pathlib.Path) -> bool:
     if "android.permission.INTERNET" not in manifest:
         index = manifest.index("<application")
         manifest = manifest[:index] + PERMISSIONS + "    " + manifest[index:]
-        changed = True
-    if "com.ryanheise.audioservice.AudioService" not in manifest:
-        index = manifest.index("</application>")
-        manifest = manifest[:index] + COMPONENTS + "    " + manifest[index:]
         changed = True
     if changed:
         path.write_text(manifest, encoding="utf-8")
