@@ -57,6 +57,7 @@ input.small { width:5.5rem; }
   <nav class="topnav" id="nav" style="display:none">
     <a href="#/">Darjas</a>
     <a href="#/users">Users</a>
+    <a href="/guide" target="_blank" rel="noopener">📖 Guide</a>
     <a class="logout" id="logout-link">Log out</a>
   </nav>
 </header>
@@ -135,9 +136,8 @@ function loginView(message) {
     "<h1>Dars-e-Nizami</h1>" +
     '<a class="download-btn" href="' + APK_URL + '">📥 Download the App (Android)</a>' +
     '<p class="hint">Students: install the app, then log in inside it with the username &amp; password your admin gave you.</p>' +
-    '<p class="hint"><a href="/guide">📖 How to use this (guide)</a></p>' +
     "</div>" +
-    '<div class="card login-card"><h2>Admin / Login</h2>' +
+    '<div class="card login-card"><h2>Login</h2>' +
     (message ? '<p class="error">' + esc(message) + "</p>" : "") +
     '<form id="login-form">' +
     '<label for="username">Username</label>' +
