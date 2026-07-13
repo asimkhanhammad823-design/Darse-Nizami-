@@ -81,7 +81,7 @@ Only the very first admin needs manual SQL — after that, all users
 **Users** page:
 
 ```bash
-npx wrangler d1 execute dars_db --remote --command "INSERT INTO app_user (access_code, name, is_admin) VALUES ('ADMIN123', 'Admin', 1);"
+npx wrangler d1 execute dars_db --remote --command "INSERT INTO app_user (access_code, username, password, name, is_admin) VALUES ('admin', 'admin', 'CHOOSE-A-PASSWORD', 'Admin', 1);"
 npx wrangler d1 execute dars_db --remote --command "INSERT INTO daraja (name, sort_order) VALUES ('Darja Awwal', 1);"
 ```
 
@@ -99,7 +99,7 @@ Test:
 
 ```bash
 curl -X POST http://localhost:8787/login -H "content-type: application/json" \
-  -d '{"access_code":"ADMIN123"}'
+  -d '{"username":"admin","password":"CHOOSE-A-PASSWORD"}'
 # => {"token":"...", "is_admin": true}
 
 curl http://localhost:8787/darajas -H "authorization: Bearer <token>"
@@ -121,11 +121,12 @@ The Worker also serves a full admin panel at:
 https://dars-worker.<your-subdomain>.workers.dev/panel
 ```
 
-Open it in any browser (phone or PC), log in with an admin access code, and
-you can do everything: create/rename/delete Darjas, Books and Lectures,
-**upload audio files** (with a progress bar; duration is detected
-automatically), manage page markers with a "Mark current time" button, and
-create/revoke student access codes on the Users page.
+Open it in any browser (phone or PC), log in with an admin username +
+password, and you can do everything: create/rename/delete Darjas, Books and
+Lectures, **upload audio files** (with a progress bar; duration is detected
+automatically), attach a **page image** to any marker, manage page markers
+with a "Mark current time" button, and create/revoke student logins on the
+Users page. The same page also has the **app download** button.
 
 This runs entirely on the Worker's free tier — there is nothing extra to
 deploy or pay for, and your admins never need Python or `localhost`. Audio
@@ -140,7 +141,7 @@ is the recommended way to administer content.
 | Method | Path | Auth | Notes |
 |---|---|---|---|
 | GET | `/health` | none | `{ok: true}` — quick deploy check |
-| POST | `/login` | none | body `{access_code}` → `{token, is_admin, name}` |
+| POST | `/login` | none | body `{username, password}` → `{token, is_admin, name}` |
 | GET | `/darajas` | Bearer token | list of darajas |
 | GET | `/darajas/:id/books` | Bearer token | books in a darja |
 | GET | `/books/:id/lectures` | Bearer token | lectures (no `audio_key`) |
@@ -159,7 +160,9 @@ Admin endpoints (require a token whose user has `is_admin = 1`):
 | GET / PUT / DELETE | `/admin/lectures/:id` | delete also removes the B2 audio object |
 | POST | `/admin/lectures/:id/markers` | `{time_seconds, page_number}` |
 | PUT / DELETE | `/admin/markers/:id` | |
-| GET / POST | `/admin/users` | create body `{name?, access_code?, is_admin?}` — omit `access_code` to auto-generate a random 8-char code |
+| GET / POST | `/admin/users` | create body `{name?, username?, password?, is_admin?}` — omit username/password to auto-generate |
+| POST | `/admin/upload` | `?filename=x.mp3` (audio) or `x.jpg` (page image); streams to B2 → `{key}` |
+| GET | `/markers/:id/image-url` | signed URL for a marker's page image |
 | PUT / DELETE | `/admin/users/:id` | you cannot delete your own account |
 
 ## Phase 1 test checklist

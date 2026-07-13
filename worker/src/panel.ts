@@ -43,6 +43,9 @@ td a { color:var(--navy); font-weight:600; text-decoration:none; cursor:pointer;
 .access-code { font-family:ui-monospace,Consolas,monospace; letter-spacing:0.08em; }
 code.access-code { background:#fff; border:1px solid var(--border); border-radius:4px; padding:0.15rem 0.4rem; font-size:1rem; }
 .checkbox-label { display:flex; align-items:center; gap:0.4rem; flex-direction:row; }
+.download-btn { display:inline-block; background:var(--teal); color:#00312c; font-weight:700; text-decoration:none; padding:0.8rem 1.2rem; border-radius:10px; margin:0.5rem 0; }
+.download-btn:hover { opacity:0.9; }
+.login-card { text-align:left; }
 progress { width:100%; height:12px; }
 audio { width:100%; }
 input.small { width:5.5rem; }
@@ -61,6 +64,8 @@ input.small { width:5.5rem; }
 <script>
 "use strict";
 var TOKEN_KEY = "dars_admin_token";
+// Public APK download (GitHub Release asset — no login needed to download).
+var APK_URL = "https://github.com/asimkhanhammad823-design/Darse-Nizami-/releases/download/app-latest/dars-nizami.apk";
 var app = document.getElementById("app");
 var nav = document.getElementById("nav");
 
@@ -126,25 +131,33 @@ function confirmDelete(message, fn) {
 function loginView(message) {
   nav.style.display = "none";
   app.innerHTML =
-    '<div class="card login-card"><h1>Admin Login</h1>' +
+    '<div class="card login-card" style="text-align:center">' +
+    "<h1>Dars-e-Nizami</h1>" +
+    '<a class="download-btn" href="' + APK_URL + '">📥 Download the App (Android)</a>' +
+    '<p class="hint">Students: install the app, then log in inside it with the username &amp; password your admin gave you.</p>' +
+    "</div>" +
+    '<div class="card login-card"><h2>Admin / Login</h2>' +
     (message ? '<p class="error">' + esc(message) + "</p>" : "") +
     '<form id="login-form">' +
-    '<label for="code">Access code</label>' +
-    '<input type="password" id="code" required autofocus />' +
+    '<label for="username">Username</label>' +
+    '<input id="username" autocapitalize="none" autocomplete="username" required autofocus />' +
+    '<label for="password">Password</label>' +
+    '<input type="password" id="password" autocomplete="current-password" required />' +
     "<button type=\\"submit\\">Log in</button></form></div>";
   document.getElementById("login-form").addEventListener("submit", async function (e) {
     e.preventDefault();
-    var code = document.getElementById("code").value.trim();
-    if (!code) return;
+    var username = document.getElementById("username").value.trim();
+    var password = document.getElementById("password").value;
+    if (!username || !password) return;
     try {
       var res = await fetch("/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ access_code: code }),
+        body: JSON.stringify({ username: username, password: password }),
       });
       var data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
-      if (!data.is_admin) throw new Error("This access code is not an admin account.");
+      if (!data.is_admin) throw new Error("This is a student account. Please log in from the mobile app instead.");
       localStorage.setItem(TOKEN_KEY, data.token);
       location.hash = "#/";
       render();
@@ -467,7 +480,7 @@ async function markersView(lectureId, title, bookId, bookName, darajaId, darajaN
   });
 }
 
-async function usersView(newCode) {
+async function usersView(created) {
   var users = await api("GET", "/admin/users");
   var rows = "";
   for (var i = 0; i < users.length; i++) {
@@ -476,24 +489,29 @@ async function usersView(newCode) {
       "<tr><td>" +
       '<form class="inline-form" data-update-user="' + u.id + '">' +
       '<input name="name" value="' + esc(u.name) + '" placeholder="(no name)" />' +
-      '<input class="access-code" name="access_code" value="' + esc(u.access_code) + '" required />' +
+      '<input class="access-code" name="username" value="' + esc(u.username) + '" required title="username" />' +
+      '<input class="access-code" name="password" value="' + esc(u.password) + '" required title="password" />' +
       '<label class="checkbox-label"><input type="checkbox" name="is_admin"' + (u.is_admin ? " checked" : "") + " /> admin</label>" +
       "<button type=\\"submit\\">Save</button></form></td>" +
       '<td><button class="danger" data-del-user="' + u.id + '">Delete</button></td></tr>';
   }
   app.innerHTML =
-    "<h1>Users &amp; Access Codes</h1>" +
-    (newCode
-      ? '<div class="card success"><strong>User created.</strong> Access code: <code class="access-code">' +
-        esc(newCode) + "</code> — share this code with the student.</div>"
+    "<h1>Users &amp; Logins</h1>" +
+    (created
+      ? '<div class="card success"><strong>User created.</strong><br/>Username: <code class="access-code">' +
+        esc(created.username) + '</code> &nbsp; Password: <code class="access-code">' +
+        esc(created.password) + "</code><br/>Give these to the student — they log in with them inside the app.</div>"
       : "") +
-    "<table><thead><tr><th>Name / Access code / Admin</th><th></th></tr></thead><tbody>" +
+    '<p class="hint">Each row: name, username, password, admin. Edit any field and press Save. Columns are the login the student/admin uses.</p>' +
+    "<table><thead><tr><th>Name / Username / Password / Admin</th><th></th></tr></thead><tbody>" +
     (rows || '<tr><td colspan=2 class="hint">No users yet.</td></tr>') +
     "</tbody></table>" +
     '<div class="card"><h2>Add User</h2><form id="add-user">' +
     "<label>Name (optional, e.g. the student's name)</label><input name=\\"name\\" />" +
-    '<label>Access code (leave blank to auto-generate)</label>' +
-    '<input name="access_code" class="access-code" placeholder="auto-generate" />' +
+    '<label>Username (leave blank to auto-generate)</label>' +
+    '<input name="username" class="access-code" placeholder="auto-generate" autocapitalize="none" />' +
+    '<label>Password (leave blank to auto-generate)</label>' +
+    '<input name="password" class="access-code" placeholder="auto-generate" />' +
     '<label class="checkbox-label"><input type="checkbox" name="is_admin" /> Admin (can use this panel)</label>' +
     "<button type=\\"submit\\">Create user</button></form></div>";
   document.getElementById("add-user").addEventListener("submit", async function (e) {
@@ -501,10 +519,11 @@ async function usersView(newCode) {
     var f = e.target;
     var body = { is_admin: f.is_admin.checked };
     if (f.name.value.trim()) body.name = f.name.value.trim();
-    if (f.access_code.value.trim()) body.access_code = f.access_code.value.trim();
+    if (f.username.value.trim()) body.username = f.username.value.trim();
+    if (f.password.value.trim()) body.password = f.password.value.trim();
     try {
-      var created = await api("POST", "/admin/users", body);
-      usersView(created.access_code);
+      var newUser = await api("POST", "/admin/users", body);
+      usersView(newUser);
     } catch (err) { showError(err); }
   });
   app.querySelectorAll("[data-update-user]").forEach(function (f) {
@@ -513,7 +532,8 @@ async function usersView(newCode) {
       try {
         await api("PUT", "/admin/users/" + f.dataset.updateUser, {
           name: f.name.value.trim() || null,
-          access_code: f.access_code.value.trim(),
+          username: f.username.value.trim(),
+          password: f.password.value.trim(),
           is_admin: f.is_admin.checked,
         });
         render();

@@ -25,19 +25,21 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _codeController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _loading = false;
   String? _error;
 
   Future<void> _submit() async {
-    final code = _codeController.text.trim();
-    if (code.isEmpty) return;
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+    if (username.isEmpty || password.isEmpty) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final token = await widget.apiClient.login(code);
+      final token = await widget.apiClient.login(username, password);
       await widget.authStorage.saveToken(token);
       widget.apiClient.setToken(token);
       if (!mounted) return;
@@ -52,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } on ApiException catch (e) {
       setState(() {
         _error = e.statusCode == 401
-            ? 'Invalid access code. Please try again.'
+            ? 'Invalid username or password. Please try again.'
             : e.message;
       });
     } catch (e) {
@@ -64,7 +66,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _codeController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -106,10 +109,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 16),
                       ],
                       TextField(
-                        controller: _codeController,
+                        controller: _usernameController,
+                        textInputAction: TextInputAction.next,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        decoration: const InputDecoration(
+                          labelText: 'Username',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _passwordController,
                         obscureText: true,
                         decoration: const InputDecoration(
-                          labelText: 'Access Code',
+                          labelText: 'Password',
                           border: OutlineInputBorder(),
                         ),
                         onSubmitted: (_) => _submit(),

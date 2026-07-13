@@ -19,6 +19,9 @@ on:
     branches: [claude/audio-dars-e-nizami-l5855z]
     paths: ["app/**", ".github/workflows/build-apk.yml"]
 
+permissions:
+  contents: write # needed to publish the APK as a release asset
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -60,3 +63,14 @@ jobs:
           name: dars-nizami-apk
           path: dars-nizami.apk
           retention-days: 90
+
+      # Publish to a fixed "app-latest" release so there is a stable PUBLIC
+      # download URL (no GitHub login needed), which the landing page links to:
+      #   .../releases/download/app-latest/dars-nizami.apk
+      - name: Publish APK to public release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: Latest App Build
+          body: "Latest Dars-e-Nizami student app. Download dars-nizami.apk below."
+          files: dars-nizami.apk

@@ -78,14 +78,14 @@ class ApiClient {
   }
 
   /// Returns the session token on success, throws ApiException otherwise.
-  Future<String> login(String accessCode) async {
+  Future<String> login(String username, String password) async {
     final http.Response response;
     try {
       response = await http
           .post(
             Uri.parse('$kWorkerBaseUrl/login'),
             headers: {'content-type': 'application/json'},
-            body: jsonEncode({'access_code': accessCode}),
+            body: jsonEncode({'username': username, 'password': password}),
           )
           .timeout(_kRequestTimeout);
     } on SocketException {

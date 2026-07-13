@@ -6,9 +6,12 @@ browser chahiye — mobile ya computer, kuch install nahi karna.
 ## Panel kholna
 
 1. Browser mein yeh link kholen (owner se milega):
-   `https://dars-worker.<subdomain>.workers.dev/panel`
-2. Apna **admin access code** likh kar **Log in** dabayen.
-3. Tip: is page ko bookmark kar lein ya home screen par add kar lein.
+   `https://dars-worker.<subdomain>.workers.dev/`
+2. Neeche **Login** mein apna **username aur password** daal kar **Log in**
+   dabayen. Admin login karte hi panel khul jayega.
+3. Isi page par upar **📥 Download the App** button bhi hai — app isi se
+   download hoti hai (admin aur students dono yahin se).
+4. Tip: is page ko bookmark kar lein ya home screen par add kar lein.
 
 ## Darja / Kitab / Lecture banana
 
@@ -45,21 +48,24 @@ Ab student ki app mein audio ke sath sahi safa number khud dikhega.
 
 Upar **Users** kholen:
 
-1. Student ka naam likhen, **access code khali chhor den**, **Create user**
-   dabayen.
-2. Panel ek code dikhayega (misal: `K7RXM2PN`) — **yehi code student ko
-   den**, isi se woh app mein login karega.
-3. Kisi student ka access khatam karna ho to us ke aage **Delete** — code
-   foran band ho jayega.
+1. Student ka naam likhen. **Username aur password khali chhor den** to panel
+   khud bana dega (ya apni marzi ke likh dein). **Create user** dabayen.
+2. Panel **username aur password** dono dikhayega — **yehi do cheezein
+   student ko den**, isi se woh app mein login karega.
+3. Kisi student ka password badalna ho to us row mein naya password likh kar
+   **Save**; access khatam karna ho to **Delete** — foran band ho jayega.
 4. Kisi aur ko admin banana ho to us ke "admin" par tick laga kar **Save**.
+
+> Aap ka apna (main admin) username/password bhi isi table mein hai — chahen
+> to yahan se badal sakte hain.
 
 ## Student app (students ko yeh batayen)
 
-1. APK file install karen (owner se milegi). Pehli baar phone poochega to
-   "unknown apps" ki ijazat den.
-2. App khol kar apna **access code** likhen.
+1. App download karen: landing page ke **📥 Download the App** button se, ya
+   owner APK file bhej dega. Pehli baar phone "unknown apps" ki ijazat mange
+   to de dein.
+2. App khol kar apna **username aur password** daalen.
 3. Darja → Kitab → Lecture chunen aur sunen:
-   - Phone lock hone par bhi audio chalta rahega (lock-screen controls).
    - Speed 1x / 1.25x / 1.5x / 2x, 10-second aage/peechhe.
    - Jahan chhora tha, agli baar wahi se shuru hoga — aur home screen ka
      **Continue listening** card aakhri dars foran khol deta hai.

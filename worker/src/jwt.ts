@@ -27,7 +27,7 @@ async function hmacKey(secret: string): Promise<CryptoKey> {
 
 export interface JwtPayload {
   sub: number; // app_user id
-  access_code: string;
+  username: string;
   is_admin: boolean;
   exp: number; // unix seconds
 }

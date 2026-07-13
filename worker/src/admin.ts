@@ -431,14 +431,13 @@ async function uploadFile(request: Request, env: Env): Promise<Response> {
   return json({ key, audio_key: key }, 201);
 }
 
-// ---- Users (student access codes) ----
+// ---- Users (username + password) ----
 
-// Unambiguous alphabet (no 0/O, 1/I/L) so codes are easy to read out loud.
+// Unambiguous alphabet (no 0/O, 1/I/L) so credentials are easy to read out.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
-function generateAccessCode(length = 8): string {
-  // Rejection sampling to avoid modulo bias: 248 = floor(256/31)*31, so bytes
-  // >= 248 are discarded, keeping every code character equally likely.
+function randomCode(length: number): string {
+  // Rejection sampling to avoid modulo bias.
   const n = CODE_ALPHABET.length;
   const limit = Math.floor(256 / n) * n;
   let code = "";
@@ -455,71 +454,104 @@ function generateAccessCode(length = 8): string {
   return code;
 }
 
+function cleanUsername(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  // 3–40 chars, letters/digits/._- only (no spaces).
+  return /^[A-Za-z0-9._-]{3,40}$/.test(trimmed) ? trimmed : null;
+}
+
 async function listUsers(env: Env): Promise<Response> {
   const { results } = await env.DB.prepare(
-    "SELECT id, access_code, name, is_admin FROM app_user ORDER BY id ASC"
+    "SELECT id, username, password, name, is_admin FROM app_user ORDER BY id ASC"
   ).all();
   return json(results);
 }
 
 async function createUser(request: Request, env: Env): Promise<Response> {
-  const body = await parseBody<{ name?: unknown; access_code?: unknown; is_admin?: unknown }>(request);
-  const name = body?.name === undefined || body?.name === null ? null : cleanName(body.name);
+  const body = await parseBody<{ name?: unknown; username?: unknown; password?: unknown; is_admin?: unknown }>(request);
+  const name = body?.name === undefined || body?.name === null || body?.name === "" ? null : cleanName(body.name);
   if (body?.name !== undefined && body?.name !== null && body?.name !== "" && name === null) {
     return badRequest("name must be a string");
   }
-  let accessCode: string;
-  if (body?.access_code !== undefined && body?.access_code !== null && body?.access_code !== "") {
-    if (typeof body.access_code !== "string" || body.access_code.trim().length < 6) {
-      return badRequest("access_code must be at least 6 characters");
-    }
-    accessCode = body.access_code.trim();
+
+  // Username: required-ish — auto-generate a readable one if blank.
+  let username: string;
+  if (body?.username !== undefined && body?.username !== null && body?.username !== "") {
+    const cleaned = cleanUsername(body.username);
+    if (!cleaned) return badRequest("username must be 3-40 characters: letters, digits, . _ - (no spaces)");
+    username = cleaned;
   } else {
-    accessCode = generateAccessCode();
+    username = "user" + randomCode(5);
   }
+
+  // Password: auto-generate if blank.
+  let password: string;
+  if (body?.password !== undefined && body?.password !== null && body?.password !== "") {
+    if (typeof body.password !== "string" || body.password.trim().length < 4) {
+      return badRequest("password must be at least 4 characters");
+    }
+    password = body.password.trim();
+  } else {
+    password = randomCode(6);
+  }
+
   const isAdmin = body?.is_admin ? 1 : 0;
   return runOrConflict(
     async () =>
       json(
         await env.DB.prepare(
-          "INSERT INTO app_user (access_code, name, is_admin) VALUES (?, ?, ?) RETURNING id, access_code, name, is_admin"
+          // access_code column is NOT NULL UNIQUE and unused for login now;
+          // keep it satisfied by mirroring the username.
+          "INSERT INTO app_user (access_code, username, password, name, is_admin) VALUES (?, ?, ?, ?, ?) RETURNING id, username, password, name, is_admin"
         )
-          .bind(accessCode, name, isAdmin)
+          .bind(username, username, password, name, isAdmin)
           .first(),
         201
       ),
-    "That access code is already in use"
+    "That username is already taken"
   ) as Promise<Response>;
 }
 
 async function updateUser(request: Request, env: Env, id: string, auth: JwtPayload): Promise<Response> {
-  const body = await parseBody<{ name?: unknown; access_code?: unknown; is_admin?: unknown }>(request);
+  const body = await parseBody<{ name?: unknown; username?: unknown; password?: unknown; is_admin?: unknown }>(request);
   if (!body) return badRequest("Invalid JSON body");
   const existing = await env.DB.prepare(
-    "SELECT id, access_code, name, is_admin FROM app_user WHERE id = ?"
+    "SELECT id, username, password, name, is_admin FROM app_user WHERE id = ?"
   )
     .bind(id)
-    .first<{ id: number; access_code: string; name: string | null; is_admin: number }>();
+    .first<{ id: number; username: string; password: string; name: string | null; is_admin: number }>();
   if (!existing) return notFound("User not found");
   const name = body.name !== undefined ? (body.name === null || body.name === "" ? null : cleanName(body.name)) : existing.name;
-  let accessCode = existing.access_code;
-  if (body.access_code !== undefined) {
-    if (typeof body.access_code !== "string" || body.access_code.trim().length < 6) {
-      return badRequest("access_code must be at least 6 characters");
-    }
-    accessCode = body.access_code.trim();
+
+  let username = existing.username;
+  if (body.username !== undefined) {
+    const cleaned = cleanUsername(body.username);
+    if (!cleaned) return badRequest("username must be 3-40 characters: letters, digits, . _ - (no spaces)");
+    username = cleaned;
   }
+
+  let password = existing.password;
+  if (body.password !== undefined && body.password !== null && body.password !== "") {
+    if (typeof body.password !== "string" || body.password.trim().length < 4) {
+      return badRequest("password must be at least 4 characters");
+    }
+    password = body.password.trim();
+  }
+
   const isAdmin = body.is_admin !== undefined ? (body.is_admin ? 1 : 0) : existing.is_admin;
   // Don't let an admin remove their own admin rights and lock themselves out.
   if (Number(id) === auth.sub && isAdmin === 0) {
     return badRequest("You cannot remove admin rights from the account you are logged in with");
   }
   return runOrConflict(async () => {
-    await env.DB.prepare("UPDATE app_user SET access_code = ?, name = ?, is_admin = ? WHERE id = ?")
-      .bind(accessCode, name, isAdmin, id)
+    await env.DB.prepare(
+      "UPDATE app_user SET access_code = ?, username = ?, password = ?, name = ?, is_admin = ? WHERE id = ?"
+    )
+      .bind(username, username, password, name, isAdmin, id)
       .run();
-    return json({ id: Number(id), access_code: accessCode, name, is_admin: isAdmin });
-  }, "That access code is already in use") as Promise<Response>;
+    return json({ id: Number(id), username, password, name, is_admin: isAdmin });
+  }, "That username is already taken") as Promise<Response>;
 }
 
 async function deleteUser(env: Env, id: string, auth: JwtPayload): Promise<Response> {
