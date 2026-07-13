@@ -43,8 +43,17 @@ td a { color:var(--navy); font-weight:600; text-decoration:none; cursor:pointer;
 .access-code { font-family:ui-monospace,Consolas,monospace; letter-spacing:0.08em; }
 code.access-code { background:#fff; border:1px solid var(--border); border-radius:4px; padding:0.15rem 0.4rem; font-size:1rem; }
 .checkbox-label { display:flex; align-items:center; gap:0.4rem; flex-direction:row; }
-.download-btn { display:inline-block; background:var(--teal); color:#00312c; font-weight:700; text-decoration:none; padding:0.8rem 1.2rem; border-radius:10px; margin:0.5rem 0; }
-.download-btn:hover { opacity:0.9; }
+.brand-title { text-align:center; margin:0 0 0.75rem; color:var(--navy); }
+.get-app { text-align:center; margin:1.75rem auto 0; }
+.download-link {
+  display:inline-flex; align-items:center; gap:0.4rem;
+  background:transparent; color:var(--teal);
+  border:1px solid var(--teal); border-radius:999px;
+  font-size:0.9rem; font-weight:600; text-decoration:none;
+  padding:0.45rem 0.95rem;
+}
+.download-link:hover { background:var(--teal); color:#fff; }
+.get-app .hint { margin-top:0.6rem; }
 .login-card { text-align:left; }
 progress { width:100%; height:12px; }
 audio { width:100%; }
@@ -132,19 +141,18 @@ function confirmDelete(message, fn) {
 function loginView(message) {
   nav.style.display = "none";
   app.innerHTML =
-    '<div class="card login-card" style="text-align:center">' +
-    "<h1>Dars-e-Nizami</h1>" +
-    '<a class="download-btn" href="' + APK_URL + '">📥 Download the App (Android)</a>' +
-    '<p class="hint">Students: install the app, then log in inside it with the username &amp; password your admin gave you.</p>' +
-    "</div>" +
-    '<div class="card login-card"><h2>Login</h2>' +
+    '<div class="card login-card"><h1 class="brand-title">Dars-e-Nizami</h1><h2>Login</h2>' +
     (message ? '<p class="error">' + esc(message) + "</p>" : "") +
     '<form id="login-form">' +
     '<label for="username">Username</label>' +
     '<input id="username" autocapitalize="none" autocomplete="username" required autofocus />' +
     '<label for="password">Password</label>' +
     '<input type="password" id="password" autocomplete="current-password" required />' +
-    "<button type=\\"submit\\">Log in</button></form></div>";
+    "<button type=\\"submit\\">Log in</button></form></div>" +
+    '<div class="get-app">' +
+    '<a class="download-link" href="' + APK_URL + '">📥 Download the App</a>' +
+    '<p class="hint">Students: install the app, then log in inside it with the username &amp; password your admin gave you.</p>' +
+    "</div>";
   document.getElementById("login-form").addEventListener("submit", async function (e) {
     e.preventDefault();
     var username = document.getElementById("username").value.trim();
