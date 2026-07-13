@@ -135,6 +135,7 @@ function loginView(message) {
     "<h1>Dars-e-Nizami</h1>" +
     '<a class="download-btn" href="' + APK_URL + '">📥 Download the App (Android)</a>' +
     '<p class="hint">Students: install the app, then log in inside it with the username &amp; password your admin gave you.</p>' +
+    '<p class="hint"><a href="/guide">📖 How to use this (guide)</a></p>' +
     "</div>" +
     '<div class="card login-card"><h2>Admin / Login</h2>' +
     (message ? '<p class="error">' + esc(message) + "</p>" : "") +
