@@ -71,11 +71,13 @@ class PageMarker {
   final int id;
   final int timeSeconds;
   final int pageNumber;
+  final bool hasImage;
 
   PageMarker({
     required this.id,
     required this.timeSeconds,
     required this.pageNumber,
+    required this.hasImage,
   });
 
   factory PageMarker.fromJson(Map<String, dynamic> json) {
@@ -83,21 +85,26 @@ class PageMarker {
       id: _asInt(json['id']),
       timeSeconds: _asInt(json['time_seconds']),
       pageNumber: _asInt(json['page_number']),
+      hasImage: _asInt(json['has_image']) == 1,
     );
   }
 
-  /// Returns the page number active at [positionSeconds], per the rule:
-  /// the marker with the largest time_seconds <= positionSeconds.
-  /// Returns null if positionSeconds is before the first marker.
-  static int? pageAt(List<PageMarker> sortedMarkers, int positionSeconds) {
-    int? page;
+  /// Returns the marker active at [positionSeconds], per the rule: the marker
+  /// with the largest time_seconds <= positionSeconds. Null if the position
+  /// is before the first marker. [sortedMarkers] must be ascending by time.
+  static PageMarker? markerAt(List<PageMarker> sortedMarkers, int positionSeconds) {
+    PageMarker? active;
     for (final marker in sortedMarkers) {
       if (marker.timeSeconds <= positionSeconds) {
-        page = marker.pageNumber;
+        active = marker;
       } else {
         break;
       }
     }
-    return page;
+    return active;
   }
+
+  /// Convenience: the page number active at [positionSeconds], or null.
+  static int? pageAt(List<PageMarker> sortedMarkers, int positionSeconds) =>
+      markerAt(sortedMarkers, positionSeconds)?.pageNumber;
 }

@@ -132,12 +132,31 @@ async function handleLecturesForBook(env: Env, bookId: string): Promise<Response
 }
 
 async function handleMarkersForLecture(env: Env, lectureId: string): Promise<Response> {
+  // image_key itself is not exposed (private bucket); the app asks for a
+  // signed image URL per marker via /markers/:id/image-url when needed.
   const { results } = await env.DB.prepare(
-    "SELECT id, lecture_id, time_seconds, page_number FROM page_marker WHERE lecture_id = ? ORDER BY time_seconds ASC"
+    "SELECT id, lecture_id, time_seconds, page_number, image_key FROM page_marker WHERE lecture_id = ? ORDER BY time_seconds ASC"
   )
     .bind(lectureId)
-    .all();
-  return json(results);
+    .all<{ id: number; lecture_id: number; time_seconds: number; page_number: number; image_key: string | null }>();
+  const markers = results.map((r) => ({
+    id: r.id,
+    lecture_id: r.lecture_id,
+    time_seconds: r.time_seconds,
+    page_number: r.page_number,
+    has_image: r.image_key ? 1 : 0,
+  }));
+  return json(markers);
+}
+
+async function handleMarkerImageUrl(env: Env, markerId: string): Promise<Response> {
+  const marker = await env.DB.prepare("SELECT image_key FROM page_marker WHERE id = ?")
+    .bind(markerId)
+    .first<{ image_key: string | null }>();
+  if (!marker) return json({ error: "Marker not found" }, 404);
+  if (!marker.image_key) return json({ error: "This page has no image" }, 404);
+  const url = await signStreamUrl(env, marker.image_key, STREAM_URL_TTL_SECONDS);
+  return json({ url, expires_in: STREAM_URL_TTL_SECONDS });
 }
 
 async function handleStreamUrl(env: Env, lectureId: string): Promise<Response> {
@@ -203,6 +222,9 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
   m = pathname.match(/^\/lectures\/(\d+)\/stream-url$/);
   if (method === "GET" && m) return handleStreamUrl(env, m[1]);
+
+  m = pathname.match(/^\/markers\/(\d+)\/image-url$/);
+  if (method === "GET" && m) return handleMarkerImageUrl(env, m[1]);
 
   return json({ error: "Not found" }, 404);
 }

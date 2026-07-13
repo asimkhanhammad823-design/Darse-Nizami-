@@ -85,16 +85,24 @@ async function updateDaraja(request: Request, env: Env, id: string): Promise<Res
 }
 
 async function deleteDaraja(env: Env, ctx: ExecutionContext, id: string): Promise<Response> {
-  // Collect audio keys before the cascade wipes the lecture rows.
-  const { results } = await env.DB.prepare(
-    `SELECT lecture.audio_key AS audio_key FROM lecture
+  // Collect audio + page-image keys before the cascade wipes the rows.
+  const audio = await env.DB.prepare(
+    `SELECT lecture.audio_key AS k FROM lecture
      JOIN book ON book.id = lecture.book_id
      WHERE book.daraja_id = ?`
   )
     .bind(id)
-    .all<{ audio_key: string }>();
+    .all<{ k: string }>();
+  const images = await env.DB.prepare(
+    `SELECT page_marker.image_key AS k FROM page_marker
+     JOIN lecture ON lecture.id = page_marker.lecture_id
+     JOIN book ON book.id = lecture.book_id
+     WHERE book.daraja_id = ? AND page_marker.image_key IS NOT NULL`
+  )
+    .bind(id)
+    .all<{ k: string }>();
   await env.DB.prepare("DELETE FROM daraja WHERE id = ?").bind(id).run();
-  ctx.waitUntil(deleteObjects(env, results.map((r) => r.audio_key)));
+  ctx.waitUntil(deleteObjects(env, [...audio.results, ...images.results].map((r) => r.k)));
   return json({ deleted: true });
 }
 
@@ -144,11 +152,18 @@ async function updateBook(request: Request, env: Env, id: string): Promise<Respo
 }
 
 async function deleteBook(env: Env, ctx: ExecutionContext, id: string): Promise<Response> {
-  const { results } = await env.DB.prepare("SELECT audio_key FROM lecture WHERE book_id = ?")
+  const audio = await env.DB.prepare("SELECT audio_key AS k FROM lecture WHERE book_id = ?")
     .bind(id)
-    .all<{ audio_key: string }>();
+    .all<{ k: string }>();
+  const images = await env.DB.prepare(
+    `SELECT page_marker.image_key AS k FROM page_marker
+     JOIN lecture ON lecture.id = page_marker.lecture_id
+     WHERE lecture.book_id = ? AND page_marker.image_key IS NOT NULL`
+  )
+    .bind(id)
+    .all<{ k: string }>();
   await env.DB.prepare("DELETE FROM book WHERE id = ?").bind(id).run();
-  ctx.waitUntil(deleteObjects(env, results.map((r) => r.audio_key)));
+  ctx.waitUntil(deleteObjects(env, [...audio.results, ...images.results].map((r) => r.k)));
   return json({ deleted: true });
 }
 
@@ -249,8 +264,14 @@ async function deleteLecture(env: Env, ctx: ExecutionContext, id: string): Promi
   const lecture = await env.DB.prepare("SELECT audio_key FROM lecture WHERE id = ?")
     .bind(id)
     .first<{ audio_key: string }>();
+  const images = await env.DB.prepare(
+    "SELECT image_key AS k FROM page_marker WHERE lecture_id = ? AND image_key IS NOT NULL"
+  )
+    .bind(id)
+    .all<{ k: string }>();
   await env.DB.prepare("DELETE FROM lecture WHERE id = ?").bind(id).run();
-  if (lecture) ctx.waitUntil(deleteObjects(env, [lecture.audio_key]));
+  const keys = [...(lecture ? [lecture.audio_key] : []), ...images.results.map((r) => r.k)];
+  if (keys.length) ctx.waitUntil(deleteObjects(env, keys));
   return json({ deleted: true });
 }
 
@@ -266,22 +287,27 @@ async function getLectureAdmin(env: Env, id: string): Promise<Response> {
 
 // ---- Page markers ----
 
+function cleanKey(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 async function createMarker(request: Request, env: Env, lectureId: string): Promise<Response> {
-  const body = await parseBody<{ time_seconds?: unknown; page_number?: unknown }>(request);
+  const body = await parseBody<{ time_seconds?: unknown; page_number?: unknown; image_key?: unknown }>(request);
   const timeSeconds = cleanInt(body?.time_seconds, { min: 0 });
   const pageNumber = cleanInt(body?.page_number, { min: 1 });
   if (timeSeconds === null || pageNumber === null) {
     return badRequest("time_seconds (>= 0) and page_number (>= 1) are required");
   }
+  const imageKey = body?.image_key === undefined || body?.image_key === null ? null : cleanKey(body.image_key);
   return runOrConflict(
     async () =>
       json(
         await env.DB.prepare(
-          `INSERT INTO page_marker (lecture_id, time_seconds, page_number)
-           VALUES (?, ?, ?)
-           RETURNING id, lecture_id, time_seconds, page_number`
+          `INSERT INTO page_marker (lecture_id, time_seconds, page_number, image_key)
+           VALUES (?, ?, ?, ?)
+           RETURNING id, lecture_id, time_seconds, page_number, image_key`
         )
-          .bind(lectureId, timeSeconds, pageNumber)
+          .bind(lectureId, timeSeconds, pageNumber, imageKey)
           .first(),
         201
       ),
@@ -289,31 +315,52 @@ async function createMarker(request: Request, env: Env, lectureId: string): Prom
   ) as Promise<Response>;
 }
 
-async function updateMarker(request: Request, env: Env, id: string): Promise<Response> {
-  const body = await parseBody<{ time_seconds?: unknown; page_number?: unknown }>(request);
+async function updateMarker(request: Request, env: Env, ctx: ExecutionContext, id: string): Promise<Response> {
+  const body = await parseBody<{ time_seconds?: unknown; page_number?: unknown; image_key?: unknown }>(request);
   if (!body) return badRequest("Invalid JSON body");
   const existing = await env.DB.prepare(
-    "SELECT id, lecture_id, time_seconds, page_number FROM page_marker WHERE id = ?"
+    "SELECT id, lecture_id, time_seconds, page_number, image_key FROM page_marker WHERE id = ?"
   )
     .bind(id)
-    .first<{ id: number; lecture_id: number; time_seconds: number; page_number: number }>();
+    .first<{ id: number; lecture_id: number; time_seconds: number; page_number: number; image_key: string | null }>();
   if (!existing) return notFound("Marker not found");
   const timeSeconds = body.time_seconds !== undefined ? cleanInt(body.time_seconds, { min: 0 }) : existing.time_seconds;
   if (timeSeconds === null) return badRequest("time_seconds must be an integer >= 0");
   const pageNumber = body.page_number !== undefined ? cleanInt(body.page_number, { min: 1 }) : existing.page_number;
   if (pageNumber === null) return badRequest("page_number must be an integer >= 1");
-  await env.DB.prepare("UPDATE page_marker SET time_seconds = ?, page_number = ? WHERE id = ?")
-    .bind(timeSeconds, pageNumber, id)
+  // image_key: undefined = leave as-is; null/"" = clear; string = replace.
+  const imageKey =
+    body.image_key === undefined
+      ? existing.image_key
+      : body.image_key === null || body.image_key === ""
+        ? null
+        : cleanKey(body.image_key);
+  await env.DB.prepare("UPDATE page_marker SET time_seconds = ?, page_number = ?, image_key = ? WHERE id = ?")
+    .bind(timeSeconds, pageNumber, imageKey, id)
     .run();
-  return json({ id: Number(id), lecture_id: existing.lecture_id, time_seconds: timeSeconds, page_number: pageNumber });
+  // If the image was replaced or cleared, delete the old object.
+  if (existing.image_key && existing.image_key !== imageKey) {
+    ctx.waitUntil(deleteObjects(env, [existing.image_key]));
+  }
+  return json({
+    id: Number(id),
+    lecture_id: existing.lecture_id,
+    time_seconds: timeSeconds,
+    page_number: pageNumber,
+    image_key: imageKey,
+  });
 }
 
-async function deleteMarker(env: Env, id: string): Promise<Response> {
+async function deleteMarker(env: Env, ctx: ExecutionContext, id: string): Promise<Response> {
+  const existing = await env.DB.prepare("SELECT image_key FROM page_marker WHERE id = ?")
+    .bind(id)
+    .first<{ image_key: string | null }>();
   await env.DB.prepare("DELETE FROM page_marker WHERE id = ?").bind(id).run();
+  if (existing?.image_key) ctx.waitUntil(deleteObjects(env, [existing.image_key]));
   return json({ deleted: true });
 }
 
-// ---- Audio upload (streamed through the Worker into the private bucket) ----
+// ---- File upload (streamed through the Worker into the private bucket) ----
 
 const AUDIO_CONTENT_TYPES: Record<string, string> = {
   mp3: "audio/mpeg",
@@ -325,14 +372,23 @@ const AUDIO_CONTENT_TYPES: Record<string, string> = {
   flac: "audio/flac",
 };
 
-async function uploadAudio(request: Request, env: Env): Promise<Response> {
+const IMAGE_CONTENT_TYPES: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+};
+
+async function uploadFile(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const filename = url.searchParams.get("filename") || "";
   const ext = filename.includes(".") ? filename.split(".").pop()!.toLowerCase() : "";
-  const contentType = AUDIO_CONTENT_TYPES[ext];
+  const isImage = ext in IMAGE_CONTENT_TYPES;
+  const contentType = AUDIO_CONTENT_TYPES[ext] ?? IMAGE_CONTENT_TYPES[ext];
   if (!contentType) {
     return badRequest(
-      `Unsupported audio file. Allowed extensions: ${Object.keys(AUDIO_CONTENT_TYPES).join(", ")}`
+      `Unsupported file type. Allowed: ${[...Object.keys(AUDIO_CONTENT_TYPES), ...Object.keys(IMAGE_CONTENT_TYPES)].join(", ")}`
     );
   }
   const contentLength = request.headers.get("content-length");
@@ -346,7 +402,8 @@ async function uploadAudio(request: Request, env: Env): Promise<Response> {
   }
   if (!request.body) return badRequest("Missing request body");
 
-  const key = `audio/lec_${Math.floor(Date.now() / 1000)}_${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  const prefix = isImage ? "images/img" : "audio/lec";
+  const key = `${prefix}_${Math.floor(Date.now() / 1000)}_${crypto.randomUUID().slice(0, 8)}.${ext}`;
 
   // Stream the incoming body straight to B2 without buffering it in memory.
   // UNSIGNED-PAYLOAD lets aws4fetch sign the request without hashing the body.
@@ -370,7 +427,8 @@ async function uploadAudio(request: Request, env: Env): Promise<Response> {
   if (!b2Response.ok) {
     return json({ error: `Storage upload failed (${b2Response.status})` }, 502);
   }
-  return json({ audio_key: key }, 201);
+  // `key` is the generic object key; `audio_key` kept for backward compat.
+  return json({ key, audio_key: key }, 201);
 }
 
 // ---- Users (student access codes) ----
@@ -502,10 +560,10 @@ export async function handleAdminRoute(
   if (m && method === "POST") return createMarker(request, env, m[1]);
 
   m = pathname.match(/^\/admin\/markers\/(\d+)$/);
-  if (m && method === "PUT") return updateMarker(request, env, m[1]);
-  if (m && method === "DELETE") return deleteMarker(env, m[1]);
+  if (m && method === "PUT") return updateMarker(request, env, ctx, m[1]);
+  if (m && method === "DELETE") return deleteMarker(env, ctx, m[1]);
 
-  if (method === "POST" && pathname === "/admin/upload") return uploadAudio(request, env);
+  if (method === "POST" && pathname === "/admin/upload") return uploadFile(request, env);
 
   if (method === "GET" && pathname === "/admin/users") return listUsers(env);
   if (method === "POST" && pathname === "/admin/users") return createUser(request, env);

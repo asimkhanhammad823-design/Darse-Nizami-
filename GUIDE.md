@@ -31,7 +31,12 @@ Har lecture ke aage **Markers ›** dabayen:
 2. Jab ustaad naya safa shuru karen, **Mark current time** dabayen — waqt
    khud bhar jayega.
 3. **Page number** likh kar **Add Marker** dabayen.
-4. Ghalti ho jaye to kisi bhi marker ka waqt/page badal kar **Save**, ya
+4. **Page ki tasveer (optional):** "Page image" mein us safa ki photo/scan
+   choose kar ke add karen — phir student ko sunte waqt woh tasveer screen
+   par dikhegi (number ki jagah). Tasveer na den to sirf number dikhega.
+   Kisi marker ki tasveer badalni ho to us row mein nai file choose kar ke
+   **Save** — purani khud delete ho jayegi.
+5. Ghalti ho jaye to kisi bhi marker ka waqt/page badal kar **Save**, ya
    **Delete** kar den.
 
 Ab student ki app mein audio ke sath sahi safa number khud dikhega.
@@ -60,8 +65,11 @@ Upar **Users** kholen:
      **Continue listening** card aakhri dars foran khol deta hai.
    - Lecture list mein har dars ke neeche progress bar dikhti hai (kitna
      sun chuke hain).
-   - Screen par bara **Safa** number audio ke sath badalta rahega, aur
-     **Safa list** button se kisi bhi safa par seedha jump kar sakte hain.
+   - Screen par bara **Safa** number audio ke sath badalta rahega — aur agar
+     admin ne us safa ki **tasveer** lagai hai to number ki jagah wohi
+     tasveer dikhegi (zoom bhi kar sakte hain). Audio isi dauran chalti
+     rahegi.
+   - **Safa list** button se kisi bhi safa par seedha jump kar sakte hain.
    - **Sleep timer** (chand ka nishan): 15/30/60 minute baad audio khud
      ruk jayegi — raat ko sunne ke liye.
 4. Screenshot / screen-recording app ke andar kaam nahi karegi — yeh jaan
